@@ -1,5 +1,5 @@
-﻿[
-    "automatic-table-of-contents",
-    "math-in-callout",
-    "obsidian-git"
+[
+  "obsidian-git",
+  "math-in-callout",
+  "automatic-table-of-contents"
 ]
