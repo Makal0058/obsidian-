@@ -3,7 +3,7 @@
 > - **中文题目**：面向多步任务的自我评估大语言模型：用于失败检测的逐步置信度估计
 > - **期刊/会议**：NeurIPS 2025 Workshop: Multi-Turn Interactions in Large Language Models
 > - **年份**：2025
-> - **主题**： #置信度估计 #多步推理 #LLM可靠性 #Agent #失败检测
+> - **Tag**： #置信度估计 #多步推理 #LLM可靠性 #Agent #失败检测
 
 ---
 ```table-of-contents
