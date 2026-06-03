@@ -615,3 +615,136 @@ mindmap
 ---
 # 六、关联课题需求（该文献的方法能否解决我的实验痛点、其缺陷是否可通过我的方案弥补）
 
+> [!abstract] 核心判断（先把结论摆前面）
+> 这篇 (Young 2026) 与我的 Graph-Intervention Faithfulness (GIF) **不是同一个 faithfulness 构念**。它测的是 **verbalization faithfulness**（CoT 是否**口头承认**了承重因素），我测的是 **structural/causal faithfulness**（输出是否**因果依赖**图结构、还是被序列化位置启发式劫持）
+> → **能借**：它的跨家族广度、可复现脚手架、thinking-vs-answer 通道框架（作引用先例）
+> → **不能借且我更强**：它的核心测量（LLM-judge 判 verbalization）正是 GIF 要规避的——我的 GFI 是干预后计算出的指标，比 judge 主观判定更客观
+> → **必须警惕**：若把两者当同一回事写 related work，审稿人会抓"构念混淆"。GIF 应自我定位在 Lanham/Chua 的**因果干预谱系**，把 Young 当作*互补*的跨家族口头承认评测
+
+## 6.1 两套范式的本质差异（定位先于借用）
+
+| 维度 | Young 2026（本文） | 我的 GIF |
+|---|---|---|
+| faithfulness 构念 | 口头承认（verbalization） | 结构/因果遵循 |
+| 测量手段 | hint 注入 → 看 CoT 是否提及 hint | 图干预 → 看输出是否随图结构变 |
+| 是否依赖模型"说出来" | **是**（核心弱点） | **否**（行为/干预，绕开口头化） |
+| 核心指标 | Faithfulness Rate = influenced∩faithful / influenced | **GFI = Raw GIS − PC-GIS** |
+| 判定者 | LLM-judge（load-bearing 主观判定） | 干预结果计算（judge 介入少/可消） |
+| 谱系归属 | Turpin/Chen 的 hint-injection 传统 | Lanham(2023)/Chua(2025) 的因果干预传统 |
+| 失败模式命名 | 内部识别·外显压制 | **终点锚定（endpoint anchoring）** |
+
+> [!note] 一句话
+> 它问"模型说没说"，我问"模型是不是真按图走、还是偷看了序列化位置"。同属"表面遵守 ≠ 真实负载"大主题，但操作化层级不同——这恰是 GIF 的差异化卖点
+
+---
+## 6.2 该文献能解决我的哪些痛点（可直接借用）
+
+> [!success] 借用项 → 解决的痛点
+### 6.2.1 跨家族广度 → 修复 GIF 最大短板（外部效度）
+
+- **我的痛点**：pilot 仅 DeepSeek 单模型、4-hop 符号图、样本小 → 审稿人必问 generalizability
+- **它的供给**：12 模型 / 9 家族 / OpenRouter OpenAI-compatible 接口的现成 roster 与访问范式（temperature=0.0, seed=103）
+- **行动**：GIF 正式版直接套用同一/子集 model roster，把"GFI 在单模型上 100%→5%"升级为"GFI 跨家族稳定/分化"的实证主张
+### 6.2.2 可复现脚手架 → 降低工程风险
+
+- baseline/hinted **配对设计** ≈ 我的 **Raw GIS / PC-GIS 对照**（都是用控制条件隔离因果效应）——结构同构，可照搬其 JSONL 落盘、checkpoint 续跑、连续 10 次失败止损、全 provenance 记录
+### 6.2.3 thinking-vs-answer 通道框架 → 给我的"100%→5%"一个引用先例
+
+- **我的痛点**：pilot 里 GFI 在 answer-only 下 100%、在 JSON-CoT 显式输出路径下骤降到 5%，这个剧烈摆动需要 framing
+- **它的供给**：Young 实证 thinking 承认 87.5% vs answer 承认 28.6%（gap 58.9pp）——**"看哪个通道/格式，faithfulness 数值天差地别"已有先例**
+- **行动**：引 Young 作为"faithfulness 是 channel-dependent"的证据，再亮出 GIF 的增量——我不仅证明它是**格式/序列化依赖**的，还用干预给出**因果解释（终点锚定）**，而非 Young 那样只数关键词
+### 6.2.4 双分类器交叉一致性 → 我若用 judge 判路径遵循时的信度模板
+
+- 但这条要反着用（见 6.3）
+
+---
+## 6.3 该文献的缺陷，我的方案能否弥补（GIF 的反向贡献）
+
+> [!important] 这是这一节最有价值的部分——GIF 恰好补在 Young 自己承认的软肋上
+### 6.3.1 缺陷 A：verbalization 依赖（Young 局限）→ **GIF 完全绕开**
+
+- Young 只认*显式提及* hint，自己承认会漏判间接承认，并引 Zaman & Srivastava (2025)"CoT 可不 verbalize hint 却仍 faithful"
+- **GIF 弥补**：干预法不要求模型"说出来"——只看输出在图扰动/位置控制下是否改变。**这是 GIF 相对 hint-injection 的核心方法学优势**，正好踩在 Young 最大的软肋上
+### 6.3.2 缺陷 B：分类器依赖灾难（Young 局限，κ=0.06）→ **GIF 更客观**
+
+- Young 的 Sonnet vs pipeline 差 12.9pp，sycophancy 上 inter-judge κ 低至 **0.06** ——近乎零一致性，整个 faithfulness 数值悬在一个主观 judge 的"load-bearing"判断上
+- **GIF 弥补**：GFI = Raw GIS − PC-GIS 是**干预结果算出来的标量**，judge 介入极少甚至可消。GIF 可把 Young 的 κ=0.06 当**反面教材**写进 motivation：*正因为口头承认判定如此不可靠，才需要一个不依赖 verbalization 的因果指标*
+### 6.3.3 缺陷 C：通道 gap 无机制解释（Young 局限 + 未来方向）→ **GIF 提供因果代理**
+
+- Young 的 thinking-vs-answer gap 用 keyword（粗），自己标注"仅指示方向与量级"，并把"结合机制可解释性"列为未来方向
+- **GIF 弥补**：PC-GIS（位置控制）本身就是对"终点锚定/位置启发式"这一**机制假设的行为级因果探针**——比 keyword 计数硬，比纯 mechanistic interp 轻。GIF 等于替 Young 的未来方向 #2 走了**半步**
+
+---
+## 6.4 诚实的边界：哪些它补不了我、我也补不了它
+
+> [!warning] 不要过度宣称互补
+
+- **它补不了我的样本规模**：借了 roster 不等于做完了——GIF 仍需把 4-hop 单图集扩到多跳数/多图拓扑，这是我自己的工作量，Young 帮不上
+- **它补不了我的 gold-path 唯一性风险**：类比 Young 的 MMLU 6.7% 标签错误——我的图若存在多条等效最短路径，GFI 会被污染。**必须像 Young 5.10#6 那样显式写出这条 validity 风险**，并用 BFS/DFS 符号验证做预防性辩护（对应 Young 用 GPQA 做 clean control 的思路）
+- **我也补不了它的 MCQ 自然任务覆盖**：GIF 用符号图，同样是*受约束格式*，不能声称解决了 Young 局限 
+- **构念不可混用**：再强调一次——GIF 不是"Young 的开放权重版"，是不同操作化。related work 里并列、不并入
+
+---
+## 6.5 关联结构图：痛点 → 文献能否解决 → GIF 弥补
+
+```mermaid
+flowchart LR
+    subgraph P["我的 GIF 痛点"]
+        P1["单模型·样本小<br/>外部效度弱"]
+        P2["GFI 是否稳健<br/>会不会 judge/格式依赖"]
+        P3["100%→5% 剧烈摆动<br/>缺 framing"]
+        P4["终点锚定<br/>缺机制证据"]
+    end
+    subgraph Y["Young 2026 能否解决"]
+        Y1["✅ 借 roster<br/>12模型/9家族"]
+        Y2["⚠️ 部分：双分类器模板<br/>但其本身 κ=0.06 崩了"]
+        Y3["✅ 通道 gap 作先例<br/>87.5% vs 28.6%"]
+        Y4["❌ 仅 keyword·无机制<br/>自列为未来方向"]
+    end
+    subgraph G["GIF 反向弥补 Young"]
+        G1["补广度需我自己扩图<br/>Young 帮不上"]
+        G2["✅ GFI 干预计算<br/>绕开 verbalization 主观性"]
+        G3["✅ 升级为格式/序列化依赖<br/>并给因果解释"]
+        G4["✅ PC-GIS 作位置启发式<br/>行为级因果探针"]
+    end
+    P1 --> Y1 --> G1
+    P2 --> Y2 --> G2
+    P3 --> Y3 --> G3
+    P4 --> Y4 --> G4
+    style Y2 fill:#fff2cc,stroke:#d6b656
+    style Y4 fill:#f8cecc,stroke:#b85450
+    style G2 fill:#d5e8d4,stroke:#82b366
+    style G3 fill:#d5e8d4,stroke:#82b366
+    style G4 fill:#d5e8d4,stroke:#82b366
+```
+
+---
+## 6.6 落地行动项（投 EMNLP 2026 前）
+
+```mermaid
+mindmap
+  root((从本文吸收))
+    直接搬
+      OpenRouter roster 子集
+      seed=103·temp=0·JSONL·checkpoint
+      MMLU标签论证范式→写我的gold-path辩护
+    引用定位
+      Young作channel-dependent先例
+      κ=0.06作"为何需非verbalization指标"motivation
+      归入Lanham/Chua因果谱系·与Young并列不并入
+    坚决不搬
+      load-bearing LLM-judge作主指标
+      keyword承认率
+    我的增量话术
+      格式/序列化依赖 + 因果终点锚定
+      GFI比verbalization更客观
+      替Young未来方向#2走半步
+```
+
+> [!summary] 关联课题总结
+> **能否解决我的痛点**：能解决**外部效度**（借 roster）、**工程复现**（借脚手架）、**摆动 framing**（借 thinking-vs-answer 先例）三项；不能解决我的**样本扩展**与 **gold-path 唯一性**（这是我自己的活）
+>
+> **缺陷能否被我弥补**：能——Young 的三大软肋（verbalization 依赖、分类器 κ=0.06、通道 gap 无机制）恰好是 GIF 的强项：GFI 干预法绕开口头化、计算指标比主观 judge 客观、PC-GIS 是终点锚定的行为级因果探针。GIF 等于踩在 Young 自己承认的局限上做增量
+>
+> **一句战略定位**：把 Young 当成"跨家族但停在口头承认层"的对照工作——*它证明了 faithfulness 因家族/通道而异，但用的是会被 κ=0.06 击穿的主观判定；GIF 用因果干预把同一类现象测得更硬，并把"内部知道外显压制"具体化为"被序列化位置劫持"的可计算机制*。两者并列引用、构念不混
+
