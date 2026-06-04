@@ -225,7 +225,7 @@ Agentic 方法（ToG、PoG 等）确实能做交互式探索、避免一次性�
 > [!important] 元层面贡献
 > SoG 证明了：**许多被认为是「LLM 结构化推理的固有局限」，其实源于我们呈现问题的方式，而非模型能力的根本缺陷。** 把任务设计对齐到 LLM 的强项（基于局部上下文的迭代观察与决策），无需复杂架构、专用模块或大量 scaffolding 即可超越前人
 >
-> 这一立场与 [[Graph-Intervention Faithfulness]] 工作形成有趣张力：SoG 强调「呈现方式」决定性能（尤其强制显式输出导航路径），恰好可能对应你 Pilot 中「JSON-CoT 显著压制 endpoint anchoring」的发现——即 SoG 之所以 work，部分得益于它强制了「显式路径输出」这种位置锚定的解药
+> 这一立场与 [[12_CoT忠实性与解释评估/Graph-Intervention Faithfulness]] 工作形成有趣张力：SoG 强调「呈现方式」决定性能（尤其强制显式输出导航路径），恰好可能对应你 Pilot 中「JSON-CoT 显著压制 endpoint anchoring」的发现——即 SoG 之所以 work，部分得益于它强制了「显式路径输出」这种位置锚定的解药
 
 ---
 # 四、方法与模型

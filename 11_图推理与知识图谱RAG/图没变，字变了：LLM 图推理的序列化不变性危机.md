@@ -13,7 +13,7 @@
 
 ## 1.1 最早期：LLM 图推理"开箱即用不行"
 
-- Fatemi et al. (2023, "Talk like a graph") 是这条线的起点，第一次系统指出 LLM 对图的编码方式敏感——edge list 还是 adjacency list、节点怎么命名，都会改变结果
+- Fatemi et al. (2023, "Talk like a graph") 是这条线的起点，第一次系统指出 **LLM 对图的编码方式敏感**——edge list 还是 adjacency list、节点怎么命名，都会改变结果
 
 - 同期 Wang et al. (2023)、Tang et al.（GraphArena）、Yuan et al.（GraCoRe）都得出"现成 LLM 在图推理上表现不足"的结论。这一步确立了"问题存在"
 
