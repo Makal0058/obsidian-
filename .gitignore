@@ -2,6 +2,7 @@
 .obsidian/workspace.json
 .obsidian/workspace-mobile.json
 .obsidian/cache/
+.obsidian/sync-logs/
 .obsidian/plugins/obsidian-git/.git_credentials_input*
 .DS_Store
 Thumbs.db
