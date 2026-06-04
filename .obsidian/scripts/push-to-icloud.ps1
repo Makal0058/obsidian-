@@ -4,7 +4,6 @@ $ErrorActionPreference = 'Stop'
 $source = 'C:\Users\13403\Documents\Obsidian Vault'
 $obsidianAppFolder = [string]::Concat([char]0x7b14, [char]0x8bb0)
 $targets = @(
-    'C:\Users\13403\iCloudDrive\Obsidian\ObsidianVault-iPad',
     (Join-Path (Join-Path 'C:\Users\13403\iCloudDrive\iCloud~md~obsidian' $obsidianAppFolder) 'ObsidianVault-iPad')
 )
 $logDir = Join-Path $source '.obsidian\sync-logs'
