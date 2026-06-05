@@ -529,8 +529,6 @@ format_failurewrong_startpath_too_shortpath_too_longillegal_edge_at_hop_itrace_a
 
 其中 $illegal\_edge\_at\_hop_i$​ 表示模型在第 $i$ 跳尝试走一条图中不存在的边
 
----
-
 ### 累计延迟
 
 verifier-retry 的核心问题不只是**能不能修正**，还包括**修正要花多少时间**。因此记录每个样本在预算 $K$ 下的累计延迟：
@@ -562,7 +560,352 @@ $$\{h_{j,K}:\tau_j=\infty\}$$$$\{e_{j,K}:\tau_j=\infty\}$$
 
 因此，verifier-retry 不只是一个纠错机制，也是一种诊断工具：它能揭示模型错误是否会在外部反馈下收敛，或者是否反复卡在同一类结构性障碍上。
 
+---
+# 5 Experimental Setup 初稿
 
+进行一个聚焦的诊断实验，系统比较不同图拓扑、序列化变体、提示接口、模型家族与推理模式下的模型行为。本节说明数据构造、模型选择、prompt 接口、评价指标与实现细节。目标不是构造一个追求高准确率的通用图推理 benchmark，而是在可控条件下诊断模型是否真正忠实于输入图结构
+
+具体来说，实验同时测量两类失败：第一，**答案层的图跟随虚胖，即模型答案看似随图变化，但实际可能被终点位置锚定**；第二，**路径层的非法轨迹生成，即模型输出的结构化轨迹与答案自洽，却并不是输入图上的合法路径**
+
+这一设置建立在图序列化研究的基本观察之上：LLM 处理的不是抽象图本身，而是图的线性化文本表示；不同节点标号、边顺序或格式会把同一张图转化为不同输入字符串，而 LLM 并不天然保证对这些等价表示保持稳定
+
+## 5.1 Datasets and Graph Topologies
+
+构造合成符号图任务，而非直接使用自然语言知识图谱。随机符号节点不携带自然语言语义，可大幅削弱实体名称、常识联想和参数记忆带来的语义先验，使模型主要依赖输入图结构完成推理。语义先验与图约束交互的情况留待后续工作讨论
+
+每个任务实例包含一个有向图：
+
+$$G=(V,E)$$
+
+起点 $s$、跳数 $k$、唯一黄金路径 $p^\ast$ 和黄金答案 $y$。模型需要从 $s$ 出发，沿图中合法边恰好走 $k$ 跳，并输出最终节点。
+
+对于每个基础样本，我们构造一组反事实图对：
+
+$(G_1,G_2)$
+
+其中两张图共享相同起点 $s$ 和跳数 $k$，但拥有不同黄金终点：
+
+$y_1 \neq y_2$
+
+每张图进一步生成四种位置控制序列化：
+
+$\sigma_{\text{first}}, \quad \sigma_{\text{middle}}, \quad \sigma_{\text{last}}, \quad \sigma_{\text{decoy}}$
+
+因此，对于每个实验设置，若基础样本数为 $N$，则模型查询数为：
+
+$N \times 2 \times 4 = 8N$
+
+主实验计划取：
+
+$N=\text{【200】}$
+
+最终有效样本数、具体拓扑、hop 长度、模型与 prompt 配置见表$【X】$。
+
+### Chain Graphs
+
+链式图用于检测答案层的位置锚定。在链式图中，从起点到答案存在唯一黄金路径，图结构相对简单，主要变异来自边的序列化顺序、终点位置和诱饵节点位置
+
+链式图主要回答：
+
+> 在结构较简单时，Raw GIS 高是否真的说明模型沿图推理，还是只是被终点位置锚定？
+
+主实验计划使用：
+
+$\text{chain},\quad k=4$
+
+这一设置作为浅水区，用于暴露 answer-only prompt 下的 endpoint anchoring。
+
+### Branching Graphs with Distractors
+
+分叉图用于检测模型的**状态追踪能力和路径层忠实性**。与链式图不同，分叉图在中间节点处引入多个候选分支，模型必须维护当前节点状态，并在每一步选择正确的合法边，不能只依赖局部显著节点或最后出现节点。
+
+在分叉图中加入干扰边。为控制不同 hop 长度下的干扰强度，干扰边数量随路径长度线性增长：
+
+$m_{\text{distractor}}=2k$
+
+因此，4-hop 图加入 8 条干扰边，12-hop 图加入 24 条干扰边。所有干扰边均经过符号检查，确保不会产生额外的 $k$-hop 合法答案，也不会产生另一条同长度黄金路径
+
+主实验计划使用两档分叉图：
+
+$\text{branching},\quad k=4$
+
+$\text{branching},\quad k=12$
+
+4-hop 分叉图作为**中等难度**设置，12-hop 分叉图作为**深水区**设置。二者构成浅水区到深水区的难度对照，用于检验模型在更长路径和更多分支干扰下，答案层与路径层忠实性如何变化。需要强调的是，这里不是为了画连续退化曲线，而是为了比较浅层图推理与深层状态追踪之间的失败模式差异
+
+## 5.2 Models and Inference Modes
+
+评估三类模型设置：主实验模型、thinking 对照和 verifier-retry 对照。具体模型 API 版本、上下文窗口、temperature 设置和调用配置见表【X】。
+
+### Main Models
+
+主实验模型用于比较不同模型家族在 GIF 诊断下的行为。计划包含以下三类：
+
+| Model                        | Mode        | Role                                      |
+| ---------------------------- | ----------- | ----------------------------------------- |
+| 【DeepSeek Pro，具体版本】          | no-thinking | 中强模型在有限推理预算下的原始图跟随行为                      |
+| 【Qwen-Max，具体版本】              | no-thinking | 另一模型家族，用于检验失败模式是否跨模型存在                    |
+| 【GPT / Claude / Gemini，具体版本】 | no-thinking | cross-family closed baseline，用于检验现象的跨家族泛化 |
+
+跨家族模型按可稳定复现、temperature 可控、JSON 输出稳定、latency 可记录和成本可承受等标准选择。若最终选择 Gemini Flash、Claude Haiku 或 GPT mini 等模型，则本文将其表述为 cross-family closed baseline，而不将其声称为最强闭源上界。
+
+### Thinking Comparison
+
+thinking 对照用于检验**额外内部推理预算是否能缓解深层分叉图中的路径非法问题**。该对照不在全部矩阵上展开，而只在最关键设置上运行：
+
+$$\text{branching},\quad k=12,\quad \text{jsoncot\_strict}$$
+
+计划比较：
+
+| Model               | Mode        | Purpose           |
+| ------------------- | ----------- | ----------------- |
+| 【DeepSeek Pro，具体版本】 | no-thinking | 低内部推理预算基线         |
+| 【DeepSeek Pro，具体版本】 | thinking    | 检验内部推理预算是否提高路径合法性 |
+
+这一实验回答：
+
+> 内部 thinking 是否能解决深水区的路径非法与状态追踪失败？
+
+### Verifier-Retry Comparison
+
+verifier-retry 对照用于检验外部符号验证是否能以较低延迟修复非法轨迹。该实验同样只在深水区运行：
+
+$$\text{branching},\quad k=12,\quad \text{jsoncot\_strict},\quad K=5$$
+
+计划比较：
+
+|Model|Mode|Purpose|
+|---|---|---|
+|【DeepSeek Pro，具体版本】|no-thinking + verifier-retry|检验外部验证能否放大已有图跟随能力|
+|【Qwen-Max，具体版本】|no-thinking + verifier-retry|检验较弱底座下 verifier-retry 的能力边界|
+
+该对照用于回答：
+
+> verifier-retry 是放大已有图跟随能力，还是能够凭空创造图推理能力？
+
+### Decoding Configuration
+
+主实验使用确定性解码：
+
+$\text{temperature}=0$
+
+若某些 API 不暴露 temperature 控制，则使用 provider 默认值，并在表【X】中单独说明。
+
+## 5.3 Prompt Interfaces
+
+Prompt 是本文的核心实验变量，而非普通实现细节。不同接口会显著改变模型是否输出路径、是否显式检查边合法性，以及是否受到终点位置影响
+
+主实验计划报告三种 prompt 接口，构成从 answer-only 到 structured trace 的接口强度递增序列
+
+### direct_minimal
+
+direct_minimal **只要求模型输出最终答案，不要求输出路径**。该设置用于检测模型在没有显式路径约束时，是否依赖 endpoint position 或 decoy-last 位置线索。
+
+该 prompt 主要服务于答案层诊断，包括 Accuracy、Raw GIS、PC-GIS、GFI 和 decoy-last EAR
+
+### jsoncot_basic
+
+jsoncot_basic 要求模型输出**结构化路径和最终答案**，例如：
+
+$$\{\text{path}: [s,\dots,\hat{y}],\ \text{answer}: \hat{y}\}$$
+
+该设置用于检验显式路径输出是否能降低位置锚定，并使路径级诊断成为可能
+
+### jsoncot_strict
+
+jsoncot_strict 进一步要求模型严格输出 JSON，并满足以下约束：
+
+- path 必须包含 $k+1$ 个节点
+- path 必须从起点 $s$ 开始
+- 每一步必须沿输入图中的合法边移动
+- answer 必须等于 path 的最后一个节点
+- 输出不得包含 JSON 之外的额外文本
+
+该设置用于检验更强的结构化接口是否能提升路径合法性。需要强调的是，严格 JSON 输出并不等于忠实推理：模型可能提高格式正确率和轨迹—答案一致性，却仍然生成图上非法路径。因此，我们仍使用 PathValid、PathGoldExact 和 FailureHop 进行路径级诊断
+
+本节只列入最终实验中实际报告的 prompt。若后续加入其他 prompt，例如 stepwise_next_node，则需在此处和结果表中同步补充
+
+## 5.4 Evaluation Metrics
+
+报告三组指标：答案层指标、路径层指标和 verifier-retry 指标。具体定义见第 4 节。
+
+### Answer-Level Metrics
+
+答案层指标包括：
+
+| Metric         | Meaning                      |
+| -------------- | ---------------------------- |
+| Accuracy       | 最终答案是否等于 gold answer         |
+| Raw GIS        | 未位置控制时，答案是否随图干预改变            |
+| PC-GIS         | 位置控制后，答案是否仍随图干预改变            |
+| GFI            | Raw GIS 与 PC-GIS 的差值，衡量图跟随虚胖 |
+| decoy-last EAR | decoy-last 条件下是否输出错误诱饵节点     |
+
+Raw GIS 与 PC-GIS 在同一批反事实图对上逐样本配对计算，因此 GFI 也在样本级计算后聚合：
+
+$$\mathrm{GFI}_j = \mathrm{RawGIS}_j - \mathrm{PCGIS}_j$$
+### Path-Level Metrics
+
+路径层指标包括：
+
+| Metric                     | Meaning                     |
+| -------------------------- | --------------------------- |
+| TAC                        | 路径终点是否等于最终答案                |
+| PathValid                  | 路径是否从起点出发、长度正确、每条边合法        |
+| $\Delta_{\text{illegal}}$​ | TAC 与 PathValid 的差值，量化自洽却非法 |
+| PathGoldExact              | 路径是否完全等于 gold path          |
+| FailureHop                 | 模型第几跳开始走非法边                 |
+
+其中：
+
+$\Delta_{\text{illegal}} = \mathrm{TAC} - \mathrm{PathValid}$
+
+若 TAC 高而 PathValid 低，说明模型能够生成与最终答案一致的结构化轨迹，但该轨迹并非输入图上的合法路径
+### Verifier-Retry Metrics
+
+对于 verifier-retry 实验，额外报告：
+
+| Metric                  | Meaning               |
+| ----------------------- | --------------------- |
+| pass@K                  | 最多 $K$ 次尝试内通过符号验证的比例  |
+| final answer accuracy   | 重试结束后的**最终答案准确率**     |
+| final PathValid         | 重试结束后的**路径合法率**       |
+| final PathGoldExact     | 重试结束后的**路径精确匹配率**     |
+| average attempts        | 平均尝试次数                |
+| cumulative latency      | 截至每个 $K$ 的累计平均延迟      |
+| FailureHop distribution | 最终失败样本卡在哪一跳           |
+| error type distribution | 最终失败属于格式错、路径过短、非法边等哪类 |
+
+记录每次尝试的单次延迟和累计延迟，因此可以报告：
+
+$$(\mathrm{pass@1},\overline{L}^{(1)}), (\mathrm{pass@2},\overline{L}^{(2)}), \dots, (\mathrm{pass@K},\overline{L}^{(K)})$$
+
+这使得 verifier-retry 可以与 thinking 模式进行成本—效果比较
+
+### Confidence Intervals
+
+主实验使用确定性解码：
+
+$\text{temperature}=0$
+
+因此，同一输入在同一模型配置下具有确定性输出。使用 sample-level bootstrap 计算置信区间，即对图样本进行重采样，估计指标在不同样本集合下的稳定性。计划使用【1000 / 10000】次 bootstrap 重采样
+
+需要注意的是，该置信区间反映的是样本选择带来的不确定性，不包含 decoding randomness。将在 Limitations 中讨论这一点
+
+## 5.5 Implementation Details
+
+### Graph Generation
+
+图生成器首先采样起点 $s$，再生成长度为 $k$ 的 gold path：
+
+$p^\ast=(v_0=s,v_1,\dots,v_k=y)$
+
+随后添加干扰边，形成完整图。所有干扰边必须通过符号检查，确保不会破坏 gold endpoint 和 gold path 的唯一性
+
+### Counterfactual Pair Construction
+
+每个基础样本构造一组反事实图对：
+
+$(G_1,G_2)$
+
+二者共享相同起点 $s$ 和跳数 $k$，但拥有不同 gold endpoints：
+
+$y_1 \neq y_2$
+
+生成后，我们用 BFS/DFS 枚举从 $s$ 出发恰好 $k$ 跳可达的节点和路径，确保每张图都有唯一合法终点和唯一 gold path
+
+### Decoy Selection
+
+对于每张图，选择一个诱饵节点 $d$，满足：
+
+$d \neq y$
+
+并且 $d$ 不是从 $s$ 出发恰好 $k$ 跳可达的合法答案
+
+decoy 被放置在 decoy-last 序列化的最后位置，用于检测模型是否存在最后节点锚定
+
+### Serialization
+
+每张图生成四种位置控制序列化：
+
+$\sigma_{\text{first}}, \quad \sigma_{\text{middle}}, \quad \sigma_{\text{last}}, \quad \sigma_{\text{decoy}}$
+
+其中 endpoint-first\middle\last 控制 gold endpoint 的位置，decoy-last 将错误诱饵节点放到最后。所有序列化只改变文本顺序，不改变图结构
+
+### Output Parsing
+
+对于 direct_minimal，解析模型输出中的最终答案节点
+
+对于 jsoncot_basic 和 jsoncot_strict，解析：$(\hat{p},\hat{y})$
+
+若模型输出无法解析为指定格式，则记为 format failure。format failure 在路径层指标中视为无效路径，并记录到 error type distribution 中
+
+### Symbolic Verification
+
+所有模型输出均由符号程序离线验证。验证内容包括：
+
+- answer 是否等于 gold answer
+- path 是否从起点 $s$ 出发
+- path 长度是否为 $k+1$
+- path 中每条边是否属于 $E$
+- path 终点是否等于 answer
+- path 是否等于 gold path
+- 若非法，记录 FailureHop 和 error type
+
+在 verifier-retry 实验中，在线反馈只包含结构性错误，例如格式错误、路径长度错误、非法边或路径终点与答案不一致。验证器不会向模型泄露 gold answer。gold-answer correctness 只用于离线评估最终结果
+
+### Latency Measurement
+
+延迟以端到端 wall-clock time 记录，即从请求发出到收到响应的时间。对于 verifier-retry，同时记录每次尝试的单次延迟，以及截至每个重试预算 $K$ 的累计延迟
+
+这一设置可以比较内部 thinking 与外部符号验证之间的成本—效果关系
+
+### Timeout and Failure Handling
+
+若模型请求超时，则该样本记为 timeout，并在延迟统计中单独报告。若模型输出为空、格式错误或无法解析，则记为 format failure
+
+对于 verifier-retry 实验，format failure 会触发结构化错误反馈，并计入重试次数。每个样本最多重试：
+
+$K=5$
+
+若 $K$ 次内仍未通过验证，则该样本记为 final failure，并纳入最终 FailureHop 和 error type 分布分析
+
+### Pipeline Smoke Test
+
+在大规模运行前，先进行 $N=\text{【20】}$ 的 smoke test，以验证实验管线和日志字段。该 smoke test 不进入主结果，只用于检查以下内容：
+
+- per-attempt latency 是否正确记录
+- FailureHop 是否与符号验证结果一致
+- error type 是否正确分类
+- verifier 在线反馈是否没有泄露 gold answer
+- decoy 是否确实位于 decoy-last 序列化结尾
+- summary CSV 是否能从 attempt log 重新计算
+- timeout 和 format failure 是否被正确处理
+
+只有 smoke test 通过后，才运行正式实验
+
+### Reproducibility
+
+为了保证可复现性，固定并记录以下配置：
+
+- graph generation seed
+- topology
+- hop length
+- number of distractor edges
+- prompt template
+- model name and version
+- inference mode
+- decoding temperature
+- maximum output length
+- timeout threshold
+- retry budget $K$
+- output parser version
+- symbolic verifier version
+- timestamp
+
+所有任务文件、模型输出日志、per-attempt logs、summary CSV 和统计脚本均保存，以便重新计算指标和复现实验结果
+
+# 6 Results 初稿
 
 
 
