@@ -908,6 +908,272 @@ $K=5$
 # 6 Results 初稿
 
 
+**GIF 项目 · smoke 阶段(N=20)关键结论**
+
+**1. pilot 的 "decoy-last EAR 100%" 作废。** 原因:旧版生成器 chain 图边没 shuffle,模型直接抄有序边列表末项,造成假的 100% 锚定。新版 shuffle 后,真实锚定:chain≈0.5(中等),branching≈0。机制层面的结论,与样本量无关,可写进方法/Limitations:"早期未打乱边序的 pilot 高估了锚定强度;正式实验对所有边随机打乱以排除序列化顺序泄露。"
+
+**2. 主发现应从"GFI 虚胖/EAR 锚定"换成"TAC⇏PathValid"。** branching-12 strict 下,除 thinking 外所有模型路径自洽但非法:Qwen TAC 0.95/PathValid 0.05(Δ=0.90)、Flash 1.0/0.40、Pro 1.0/0.45。跨模型稳定,比 EAR 强、更有理论深度。EAR 和 GFI 降为辅助证据。
+
+**3. Pro-thinking 是关键对照。** branching-12 strict 下 thinking 全满分(Acc/PathValid/GoldExact=1.0,GFI=0),证明"自洽却非法"是 no-thinking 的特性,不是任务不可解。
+
+**4. verifier-retry:放大不创造(Finding 3 成立)。** branching-12 pass@1=0.45→pass@5=0.70,边际递减,卡在 0.70(剩 30% 五次也救不回)。K=5 累计延迟仅 4.55s,约为 pilot thinking 单次 59s 的 1/12——成本-效果卖点成立。难度越高 verifier 增益越大(chain 已满无提升,branching-12 提升最大)。
+
+**5. GFI 在 Raw=0 时失效(必进 Limitations)。** branching direct_minimal 全 0(Raw=0 测不出虚胖)。GFI 主战场只能是 chain 和 Raw 不为 0 的格子。
+
+**6. McNemar 全 sig=False 不是发现没了,是工具在小样本(N=20)+嵌套(PC⊂Raw,n01≡0)下没 power。** 主结果用 bootstrap CI,McNemar 放附录并注明"小样本+嵌套下保守"。发现在效应量里(Δ=0.90 这种),不在 p 值里。N=200 后 bootstrap 会显著。
+
+**7. 不要加 6/8-hop。** 现有三档已讲清梯度,加高 hop 只得更多全崩格子。若 N=200 后想补 branching-4→12 中间,再针对性加 branching-8 strict 一个点。
+
+**待办:** 跑 N=200(生死线,把上述定性变定量带 CI)→ 补 prior-only(03 加删图 prompt)→ 重写 Finding 1(收窄)+加 shuffle 方法论段 → Limitations/Abstract/结论 → 对 .bib → 注销那两个泄露的 API key。
+
+
+# claude版本
+### Smoke 结果对照表(N=20 task/setting,跑 main 时对照方向)
+
+**重要前提:每个 setting 只有 20 个 task ≈ 2.5 个完整 sample。所以 task-level 指标(Acc/PathValid/TAC/Δillegal/DecoyEAR/pass@K)方向可信;sample-level 指标(RawGIS/PCGIS/GFI)是噪声,main 之前别信那几个数。**
+
+#### 主表:no-verifier 各 setting
+
+|dataset|model|prompt|Acc|PathValid|TAC|Δillegal|DecoyEAR|备注|
+|---|---|---|---|---|---|---|---|---|
+|chain-4|Flash|direct_minimal|0.30|0.00|0.00|—|**0.60**|direct无path;有锚定|
+|chain-4|Flash|jsoncot_basic|1.00|1.00|1.00|0.00|0.00|全会|
+|chain-4|Flash|jsoncot_strict|1.00|1.00|1.00|0.00|0.00|全会|
+|chain-4|Qwen-Max|direct_minimal|0.35|0.00|0.00|—|**0.40**|有锚定|
+|chain-4|Qwen-Max|jsoncot_basic|1.00|1.00|1.00|0.00|0.00|全会|
+|chain-4|Qwen-Max|jsoncot_strict|1.00|1.00|1.00|0.00|0.00|全会|
+|branching-4|Flash|direct_minimal|0.00|0.00|0.00|—|0.00|弱提示崩|
+|branching-4|Flash|jsoncot_basic|0.80|0.80|1.00|0.20|0.00||
+|branching-4|Flash|jsoncot_strict|0.90|0.90|1.00|0.10|0.00||
+|branching-4|Qwen-Max|direct_minimal|0.00|0.00|0.00|—|0.00|弱提示崩|
+|branching-4|Qwen-Max|jsoncot_basic|0.70|0.70|1.00|0.30|0.00||
+|branching-4|Qwen-Max|jsoncot_strict|0.70|0.70|1.00|0.30|0.00||
+|**branching-12**|Flash|direct_minimal|0.00|0.00|0.00|—|0.20|弱提示崩|
+|**branching-12**|Flash|jsoncot_basic|0.40|0.40|1.00|**0.60**|0.20|⭐自洽却非法|
+|**branching-12**|Flash|jsoncot_strict|0.50|0.40|1.00|**0.60**|0.00|⭐主发现|
+|**branching-12**|Pro-nothink|jsoncot_strict|0.50|0.45|1.00|**0.55**|0.00|⭐主发现|
+|**branching-12**|**Pro-thinking**|jsoncot_strict|1.00|**1.00**|1.00|**0.00**|0.00|⭐对照:修复|
+|**branching-12**|Qwen-Max|jsoncot_basic|0.15|0.05|0.95|**0.90**|0.00|⭐gap最大|
+|**branching-12**|Qwen-Max|jsoncot_strict|0.15|0.05|0.95|**0.90**|0.00|⭐gap最大|
+
+#### verifier-retry pass@K(Flash,run1)
+
+|dataset|pass@1|pass@5|提升|K=5累计延迟|
+|---|---|---|---|---|
+|chain-4|1.00|1.00|0|1.60s|
+|branching-4|0.90|0.95|+0.05|2.06s|
+|**branching-12**|**0.45**|**0.70**|**+0.25**|**4.55s**|
+
+(thinking 单次 ≈59s 作对比 → verifier K=5 累计仅 1/12)
+
+### 跑 main 时,重点盯这几条"方向必须重现"
+
+1. **branching-12 strict 的 TAC≫PathValid**(主发现)——main 后这个 gap 必须还在:Qwen≈0.90、Flash/Pro≈0.55-0.60。这是论文命根,gap 消失=没文章。
+2. **Pro-thinking branching-12 把 PathValid 拉到≈1.0**(对照)——证明任务可解。main 后若 thinking 也低,说明任务真的太难,麻烦。
+3. **verifier branching-12 pass@1→pass@5 上升且<1**(放大不创造)——main 后应仍是"涨但饱和"。
+4. **chain direct_minimal 有 DecoyEAR(≈0.4-0.6),branching 几乎没有**(辅助)——锚定特定于线性结构。
+5. **GFI/RawGIS/PCGIS 这次别对照**——smoke 这几个是 2 sample 噪声,main(N=200=25 sample)才第一次可信。
+
+### main 跑之前的 checklist(对照表用)
+
+- prior-only 这组**还没跑**,main 要补(DeepSeek+Qwen × 3数据集,验证无图 Acc≈0)
+- 文件夹/RUN_SCOPE 用文件名带 smoke 区分,main 数据名**不要**带 smoke
+- model_tag 统一(Flash 那个 tag 有时带 `_smoke` 有时不带,会让 05/06 分组错)
+- 06 用 v2(带 speedup)、07 用 v2(带 nested 标签)
+- thinking 跑 main 时**别手动中断**(上次中断产生了 32 行重复)
+
+---
+
+# gpt版本
+
+可以。下面这个表你明天就按它跑 **main**。我把当前 smoke 结果、主实验定位、是否必须跑都合在一起了。
+
+# Main 实验对照表
+
+> smoke 只是链路验证；main 建议用 `N=200`。  
+> `prior_only` 单独统计，不进 GFI。
+
+|实验块|Dataset|Prompt|Model / Mode|Smoke 关键信号|Main 是否跑|用途|
+|---|---|---|---|---|---|---|
+|Sanity|`chain_4hop`|`direct_minimal`|Flash no-thinking|Acc 0.30, GFI 0.50, DecoyEAR 0.60|跑|最简单链式位置/弱提示基线|
+|Sanity|`chain_4hop`|`jsoncot_basic`|Flash no-thinking|Acc 1.00, PathValid 1.00|跑|证明简单链式可解|
+|Sanity|`chain_4hop`|`jsoncot_strict`|Flash no-thinking|Acc 1.00, PathValid 1.00|跑|strict 上限对照|
+|Sanity|`chain_4hop`|`direct_minimal`|Qwen Max|Acc 0.35, GFI 0.50, DecoyEAR 0.40|跑|跨模型弱提示基线|
+|Sanity|`chain_4hop`|`jsoncot_basic`|Qwen Max|Acc 1.00, PathValid 1.00|跑|简单任务可解|
+|Sanity|`chain_4hop`|`jsoncot_strict`|Qwen Max|Acc 1.00, PathValid 1.00|跑|strict 上限对照|
+|Branching-4|`branching_4hop`|`direct_minimal`|Flash no-thinking|Acc 0.00|跑|分叉下弱提示崩溃|
+|Branching-4|`branching_4hop`|`jsoncot_basic`|Flash no-thinking|Acc 0.80, PathValid 0.80|跑|分叉短路径中等难度|
+|Branching-4|`branching_4hop`|`jsoncot_strict`|Flash no-thinking|Acc 0.90, PathValid 0.90, GFI 0.50|跑|strict 是否抑制错误|
+|Branching-4|`branching_4hop`|`direct_minimal`|Qwen Max|Acc 0.00|跑|跨模型弱提示崩溃|
+|Branching-4|`branching_4hop`|`jsoncot_basic`|Qwen Max|Acc 0.70, PathValid 0.70, GFI 0.50|跑|Qwen 分叉短路径|
+|Branching-4|`branching_4hop`|`jsoncot_strict`|Qwen Max|Acc 0.70, PathValid 0.70, GFI 0.50|跑|strict 对 Qwen 是否有效|
+|Core|`branching_12hop`|`direct_minimal`|Flash no-thinking|Acc 0.00|跑|深分叉弱提示崩溃|
+|Core|`branching_12hop`|`jsoncot_basic`|Flash no-thinking|Acc 0.40, TAC 1.00, PathValid 0.40, ΔIllegal 0.60|跑|TAC⇏PathValid 主信号|
+|Core|`branching_12hop`|`jsoncot_strict`|Flash no-thinking|Acc 0.50, TAC 1.00, PathValid 0.40, ΔIllegal 0.60|跑|主结果之一|
+|Core|`branching_12hop`|`direct_minimal`|Qwen Max|Acc 0.00|跑|Qwen 弱提示崩溃|
+|Core|`branching_12hop`|`jsoncot_basic`|Qwen Max|Acc 0.15, TAC 0.95, PathValid 0.05, ΔIllegal 0.90|跑|最强 TAC⇏PathValid 信号|
+|Core|`branching_12hop`|`jsoncot_strict`|Qwen Max|Acc 0.15, TAC 0.95, PathValid 0.05, ΔIllegal 0.90|跑|Qwen strict 主结果|
+|Thinking 对照|`branching_12hop`|`jsoncot_strict`|DeepSeek Pro no-thinking|Acc 0.50, TAC 1.00, PathValid 0.45|跑|Pro 无思考失败对照|
+|Thinking 对照|`branching_12hop`|`jsoncot_strict`|DeepSeek Pro thinking|Acc 1.00, PathValid 1.00, GoldExact 1.00|必跑|证明任务可解，不是数据坏|
+|Verifier|`chain_4hop`|`jsoncot_strict`|Flash no-thinking + retry K=5|pass@1=1.00 → pass@5=1.00|可跑|sanity；可选但便宜|
+|Verifier|`branching_4hop`|`jsoncot_strict`|Flash no-thinking + retry K=5|pass@1=0.90 → pass@5=0.95|跑|verifier 短分叉增益|
+|Verifier|`branching_12hop`|`jsoncot_strict`|Flash no-thinking + retry K=5|pass@1=0.45 → pass@5=0.70|必跑|verifier 主结果|
+|Prior-only|`chain_4hop`|`prior_only`|Flash no-thinking|待补|跑|无图先验控制|
+|Prior-only|`branching_4hop`|`prior_only`|Flash no-thinking|待补|跑|无图先验控制|
+|Prior-only|`branching_12hop`|`prior_only`|Flash no-thinking|待补|跑|无图先验控制|
+|Prior-only|`chain_4hop`|`prior_only`|Qwen Max|待补|跑|跨模型无图控制|
+|Prior-only|`branching_4hop`|`prior_only`|Qwen Max|待补|跑|跨模型无图控制|
+|Prior-only|`branching_12hop`|`prior_only`|Qwen Max|待补|跑|跨模型无图控制|
+
+---
+
+# 明天 main 跑的顺序
+
+## Step 1：先跑普通 main
+
+跑这组：
+
+```
+datasets:chain_4hopbranching_4hopbranching_12hopprompts:direct_minimaljsoncot_basicjsoncot_strictmodels:DeepSeek Flash no-thinkingQwen Max
+```
+
+也就是：
+
+```
+3 datasets × 3 prompts × 2 models = 18 个 setting
+```
+
+这是主表基础。
+
+---
+
+## Step 2：跑 DeepSeek Pro 对照
+
+只跑最关键这两个：
+
+```
+branching_12hop + jsoncot_strict + DeepSeek Pro no-thinkingbranching_12hop + jsoncot_strict + DeepSeek Pro thinking
+```
+
+不要一开始全矩阵跑 Pro，太贵，而且没必要。
+
+---
+
+## Step 3：跑 verifier-retry
+
+最少跑：
+
+```
+branching_12hop + jsoncot_strict + Flash no-thinking + K=5
+```
+
+推荐跑完整三组：
+
+```
+chain_4hop + jsoncot_strict + Flash no-thinking + K=5branching_4hop + jsoncot_strict + Flash no-thinking + K=5branching_12hop + jsoncot_strict + Flash no-thinking + K=5
+```
+
+这样能讲清楚：
+
+```
+chain 无增益branching-4 小增益branching-12 大增益但饱和
+```
+
+---
+
+## Step 4：跑 prior-only
+
+最小矩阵：
+
+```
+3 datasets × 2 models = 6 个 setting
+```
+
+只跑：
+
+```
+prior_only
+```
+
+不要跑 basic / strict。prior-only 只做 sanity check，不进 GFI。
+
+---
+
+# 明天重点看哪些输出
+
+跑完 main 后，先不要急着写论文，先检查这几个表：
+
+|文件|看什么|
+|---|---|
+|`setting_summary.csv`|Acc / RawGIS / PCGIS / GFI / PathValid / TAC / DeltaIllegal|
+|`bootstrap_ci.csv`|TAC-PathValid gap、GFI 的 CI|
+|`path_error_distribution.csv`|illegal edge 主要卡在哪些 hop|
+|`verifier_passk_summary.csv`|pass@1 → pass@5 曲线|
+|`verifier_failure_hop_distribution.csv`|retry 失败是否反复卡同一跳|
+|`prior_only_summary.csv`|无图 accuracy 是否接近 0|
+
+---
+
+# 论文主结果表建议
+
+main 跑完后最终论文里可以压成三张表：
+
+## Table 1：TAC⇏PathValid 主表
+
+只放：
+
+```
+branching_12hop + jsoncot_strict
+```
+
+列：
+
+```
+Model | Acc | TAC | PathValid | DeltaIllegal | GoldExact
+```
+
+---
+
+## Table 2：Prompt / topology 梯度表
+
+放：
+
+```
+chain-4branching-4branching-12
+```
+
+列：
+
+```
+Dataset | Prompt | Model | Acc | PathValid | DeltaIllegal | GFI
+```
+
+---
+
+## Table 3：Verifier-retry 表
+
+列：
+
+```
+Dataset | pass@1 | pass@2 | pass@3 | pass@4 | pass@5 | avg latency@5 | speedup vs thinking
+```
+
+---
+
+# 明天跑之前最后检查
+
+正式 main 前确认这几个东西：
+
+```
+1. smoke/main 结果目录分开，不要混2. MODEL_TAG 统一，例如：   DeepSeek-V4-Flash_nothinking_main   qwen-max_main   DeepSeek-V4-Pro_nothinking_main   DeepSeek-V4-Pro_thinking_main   DeepSeek-V4-Flash_nothinking_main_verifyretry_k53. RUN_SCOPE = "main"4. MAX_TASKS_PER_FILE = None5. prior_only 不进 GFI，只单独 summary6. 06/07 用 v2 版本
+```
+
+一句话：**明天先跑 18 个普通 setting，再跑 2 个 Pro 对照，再跑 3 个 verifier，再补 6 个 prior-only。**  
+这个矩阵足够支撑 Findings 版主实验了。
+
+
+
+
 
 
 
