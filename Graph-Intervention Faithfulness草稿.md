@@ -1171,8 +1171,176 @@ Dataset | pass@1 | pass@2 | pass@3 | pass@4 | pass@5 | avg latency@5 | speedup v
 一句话：**明天先跑 18 个普通 setting，再跑 2 个 Pro 对照，再跑 3 个 verifier，再补 6 个 prior-only。**  
 这个矩阵足够支撑 Findings 版主实验了。
 
+---
+# 7 Analysis
 
+本节进一步分析实验结果背后的机制。总体而言，实验结果表明，模型在图路径任务上的失败并不主要来自输出格式错误，也不只是来自答案先验或候选节点偏好。相反，核心问题在于：模型可以生成形式上自洽的推理轨迹，使最终答案与轨迹末节点一致，但轨迹中的中间转移并不一定对应输入图中的真实边。换言之，**trace-answer consistency 并不蕴含 structural path validity**。
 
+---
+
+## 7.1 自洽轨迹并不等于结构合法路径
+
+Table 7.1 汇总了 `branching_12hop_N200 + jsoncot_strict` 设置下的核心结果。TAC 衡量模型输出的 `answer` 是否等于 `path` 的最后一个节点；PathValid 则要求路径从正确起点开始、长度正确，并且每一步转移都必须是图中的合法边。二者的差值记为 ΔIllegal，即：
+
+$$[  
+\Delta_{\mathrm{illegal}} = \mathrm{TAC} - \mathrm{PathValid}  
+]$$
+
+### Table 7.1 Core structural faithfulness results
+
+|Model|Setting|Tasks|Acc.|TAC|PathValid|GoldExact|ΔIllegal|
+|---|---|--:|--:|--:|--:|--:|--:|
+|AnyAIGC-routed GPT-5.4-mini|no-thinking|1600/1600|0.083|0.799|0.081|0.081|0.718|
+|Qwen-Max|no-thinking|1600/1600|0.138|0.992|0.084|0.084|0.908|
+|DeepSeek-V4-Flash|no-thinking|1600/1600|0.502|0.993|0.485|0.485|0.508|
+|DeepSeek-V4-Pro|no-thinking|1600/1600|0.564|0.999|0.554|0.554|0.446|
+|DeepSeek-V4-Pro|thinking|1599/1600|0.999|1.000|0.999|0.999|0.001|
+
+**Note.** Results are measured on the 12-hop branching graph task under the strict JSON-CoT prompt. The DeepSeek-V4-Pro thinking run has one timed-out task and is reported over 1599 completed tasks. AnyAIGC-routed GPT-5.4-mini is evaluated through a third-party OpenAI-compatible gateway.
+
+```mermaid
+xychart-beta
+    title "TAC vs PathValid on 12-hop branching"
+    x-axis ["GPT-mini", "Qwen", "Flash", "Pro-NT", "Pro-T"]
+    y-axis "Rate" 0 --> 1
+    bar "TAC" [0.799, 0.992, 0.993, 0.999, 1.000]
+    bar "PathValid" [0.081, 0.084, 0.485, 0.554, 0.999]
+```
+
+**Figure 7.1.** TAC can remain high even when PathValid is low. The gap is especially large for Qwen-Max and GPT-5.4-mini.
+
+结果显示，多个模型都呈现出明显的 TAC–PathValid gap。以 Qwen-Max 为例，其 TAC 达到 0.992，但 PathValid 只有 0.084，二者差值达到 0.908。DeepSeek-V4-Flash 也表现出类似现象：TAC 为 0.993，而 PathValid 为 0.485。DeepSeek-V4-Pro 在 no-thinking 设置下同样不能完全避免这一问题，TAC 接近 1.000，但 PathValid 仅为 0.554。
+
+这说明 strict JSON-CoT 提示确实提高了模型的格式服从能力和局部自洽性：模型通常能够输出一个 JSON 对象，并让 `answer` 字段等于 `path` 的最后一个节点。然而，这种自洽性并不保证路径中的每一步都沿着输入图的边前进。模型可能生成一条看起来合理、长度接近要求、末节点也与答案一致的路径，但其中某一步跳转并不是图中的合法边。因此，仅检查答案是否与 reasoning trace 一致是不够的；路径任务需要显式检查每条边的结构合法性。
+
+GPT-family mini 模型的结果进一步支持这一点。AnyAIGC-routed GPT-5.4-mini 在该设置下 parse rate 和 path-present rate 都为 1.000，说明它能够稳定输出所需格式；但其 PathValid 只有 0.081，ΔIllegal 达到 0.718。这表明，即使模型完全遵守输出接口，也仍可能在长程图状态追踪上失败。格式正确和结构忠实是两个不同层次的能力。
+
+相比之下，DeepSeek-V4-Pro 在 thinking 设置下几乎完全解决该任务：在 1599 个完成任务中，Accuracy、PathValid 和 GoldExact 均接近 1.000，ΔIllegal 接近 0。该 run 中有 1 个任务超时，因此我们将其作为 timed-out task 报告，而不是补跑或手动填充。这一结果说明数据集本身并非不可解，评估器也没有系统性误判；前述失败更准确地说是特定模型/推理设置下的结构追踪失败，而不是任务构造错误。
+
+---
+
+## 7.2 Prior-control 排除了节点标签先验解释
+
+一个可能的替代解释是，模型并没有真正利用图结构，而是从节点标签、候选节点集合或数据集中的符号模式中猜测答案。prior-control 实验排除了这一解释。
+
+在 `prior_only` 条件下，模型不给定图，也不给定候选节点集合；在 `candidate_only_prior` 条件下，模型只看到候选节点集合，但看不到边结构。结果显示，DeepSeek-V4-Flash 和 Qwen-Max 在 prior-only 条件下准确率均为 0；在 candidate-only 条件下，二者虽然几乎总是从候选集合中选择一个节点，但准确率仍接近或低于随机水平。
+
+### Table 7.2 Prior-control results on 12-hop branching
+
+|Model|Prior-only Acc.|Candidate-only Acc.|Chance Acc.|Acc. − Chance|In-candidate rate|
+|---|--:|--:|--:|--:|--:|
+|DeepSeek-V4-Flash|0.000|0.003|0.012|-0.009|1.000|
+|Qwen-Max|0.000|0.000|0.012|-0.012|1.000|
+
+**Note.** In candidate-only controls, models receive the candidate node set but no graph edges. Chance accuracy is estimated from the average visible candidate set size.
+
+该结果说明答案并不能从节点标签或候选集合本身恢复出来。尤其是在 candidate-only 条件下，模型的 in-candidate rate 为 1.000，说明模型确实理解了“从候选集合中选择答案”的接口要求；但准确率仍接近 0，甚至低于估计的随机准确率。这表明模型在完整图条件下的成功必须依赖边结构，而不是候选节点标签中的隐藏先验。
+
+因此，完整图条件下的失败也不能简单归因于候选节点先验不足。模型确实需要执行图上的状态转移，但弱模型或弱推理设置无法稳定完成长程结构追踪。
+
+---
+
+## 7.3 Verifier-retry 能部分修复，但不能创造图跟随能力
+
+Verifier-retry 实验进一步区分了两类能力：发现错误的能力和修复错误的能力。验证器可以检查输出路径是否从正确起点开始、长度是否为 hop+1、每条边是否合法、以及答案是否等于路径末节点。若验证失败，模型会收到错误反馈并重新生成。
+
+结果显示，verifier-retry 显著提高了 PathValid。DeepSeek-V4-Flash 在三次独立 run 中，pass@1 平均为 0.486，pass@5 平均为 0.706，提升约 22.1 个百分点。Qwen-Max 在两次独立 run 中，pass@1 平均为 0.084，pass@5 平均为 0.334，提升约 25.0 个百分点。
+
+### Table 7.3 Verifier-retry results
+
+|Model|Runs|pass@1|pass@5|Gain|Avg. latency at K=5|Remaining failures|Repeated same hop|
+|---|--:|--:|--:|--:|--:|--:|--:|
+|DeepSeek-V4-Flash|3|0.486 ± 0.002|0.706 ± 0.003|+0.221|4.42s|1410 / 4800|0.690|
+|Qwen-Max|2|0.084 ± 0.000|0.334 ± 0.002|+0.250|12.12s|2130 / 3200|0.837|
+
+**Note.** pass@K denotes whether any attempt within K tries passes the structural verifier. Repeated same hop measures the fraction of remaining failed tasks whose attempts repeatedly fail at the same hop.
+
+```mermaid
+xychart-beta
+    title "Verifier-retry pass@K"
+    x-axis [1, 2, 3, 4, 5]
+    y-axis "Pass rate" 0 --> 1
+    line "Flash mean" [0.486, 0.590, 0.644, 0.686, 0.706]
+    line "Qwen mean" [0.084, 0.172, 0.241, 0.298, 0.334]
+```
+
+**Figure 7.2.** Verifier-retry improves structural validity, but the improvement saturates before reaching the thinking baseline.
+
+然而，verifier-retry 的提升明显饱和。Flash 在 K=5 后仍有 1410/4800 个任务失败；Qwen-Max 两次 run 合计仍有 2130/3200 个任务失败。这说明验证器反馈可以放大模型已有的图跟随能力，但不能完全替代模型自身的结构追踪能力。对于本来较弱的模型，验证器能够指出错误，却不一定能让模型成功修复错误。
+
+这一点与 DeepSeek-V4-Pro thinking 的结果形成对照。Pro thinking 在相同数据和 prompt 下几乎完全解决任务，而 verifier-retry 虽然提高了 Flash 和 Qwen 的成功率，却远未达到 thinking baseline。这说明 verifier-retry 更像是一种低成本的纠错机制，而不是一种能够从外部“注入”图推理能力的机制。
+
+---
+
+## 7.4 剩余失败主要是重复的非法边错误
+
+Failure pattern 分析进一步说明，K=5 后的剩余失败并不是随机格式错误。Flash 的剩余失败主要集中在 `illegal_edge_at_hop_2`、`path_too_short` 和 `illegal_edge_at_hop_12`。合并三次 run 后，Flash 的 top final errors 如下：`illegal_edge_at_hop_2` 占 31.1%，`path_too_short` 占 15.0%，`illegal_edge_at_hop_12` 占 14.3%，`illegal_edge_at_hop_3` 占 9.5%。
+
+Qwen-Max 的失败模式更集中于非法边。合并两次 run 后，Qwen 的 top final errors 为：`illegal_edge_at_hop_2` 占 15.4%，`illegal_edge_at_hop_3` 占 15.3%，`illegal_edge_at_hop_12` 占 13.8%，`illegal_edge_at_hop_4` 占 11.0%。相比 Flash，Qwen 的 `path_too_short` 比例很低，说明它通常能够输出长度接近要求的路径，但路径中的边不合法。它的问题不是不会生成路径，而是不能可靠地沿图边更新当前节点状态。
+
+### Table 7.4 Residual verifier-retry failure patterns
+
+|Model|Runs|Final failures|Top final errors|Repeated same hop|
+|---|--:|--:|---|--:|
+|DeepSeek-V4-Flash|3|1410|hop2 illegal, path too short, hop12 illegal|0.690|
+|Qwen-Max|2|2130|hop2/3 illegal, hop12 illegal, hop4 illegal|0.837|
+
+```mermaid
+xychart-beta
+    title "Repeated same-hop failures after K=5"
+    x-axis ["Flash", "Qwen"]
+    y-axis "Rate" 0 --> 1
+    bar "Repeated same hop" [0.690, 0.837]
+```
+
+**Figure 7.3.** Most remaining verifier-retry failures repeatedly fail at the same hop, especially for Qwen-Max.
+
+更重要的是，大量失败会反复卡在同一个 hop。Flash 三次 run 中，约 69.0% 的剩余失败具有 `repeated_same_hop=True`；Qwen-Max 两次 run 中这一比例约为 83.7%。这表明，模型在收到验证器反馈后，并不是每次随机犯不同错误，而是经常在同一个结构转移处反复失败。换言之，验证器能够暴露错误位置，但模型并不总能利用该反馈修复底层状态追踪失败。
+
+这一发现支持本文的核心观点：结构忠实性不是单靠输出格式、答案一致性或后验验证就能保证的。若模型缺乏稳定的图状态更新能力，即使它知道“上一条路径第 h 步不合法”，也可能在相同或相近的位置再次生成非法转移。
+
+---
+
+## 7.5 位置锚定是辅助现象，而非主失败机制
+
+在较简单的 chain 图和弱提示条件下，我们观察到明显的位置锚定现象。例如，在 `chain_4hop + direct_minimal` 设置下，Flash 的 GFI 达到 0.685，Qwen-Max 的 GFI 达到 0.380。这表明，在没有严格路径约束的提示下，模型可能倾向于选择序列化图中靠近末尾或显著位置的节点，从而使 RawGIS 虚高。
+
+### Table 7.5 Position anchoring and GFI
+
+|Dataset|Model|Prompt|RawGIS|PCGIS|GFI|DecoyEAR|
+|---|---|---|--:|--:|--:|--:|
+|chain_4hop|DeepSeek-V4-Flash|direct_minimal|0.685|0.000|0.685|0.638|
+|chain_4hop|Qwen-Max|direct_minimal|0.380|0.000|0.380|0.198|
+|branching_4hop|DeepSeek-V4-Flash|jsoncot_strict|0.615|0.375|0.240|0.000|
+|branching_4hop|Qwen-Max|jsoncot_strict|0.265|0.075|0.190|0.008|
+|branching_12hop|DeepSeek-V4-Flash|jsoncot_strict|0.115|0.000|0.115|0.060|
+|branching_12hop|Qwen-Max|jsoncot_strict|0.020|0.000|0.020|0.060|
+
+然而，在 strict JSON-CoT 和 branching 图设置下，位置锚定不再是主要解释。此时模型通常会生成路径，且答案与路径末节点一致；主要失败来自路径中间边不合法，而不是简单复制末端节点或 decoy 节点。尤其是在 12-hop branching 任务上，DecoyEAR 较低，但 ΔIllegal 很高，说明模型不是单纯被末端节点吸引，而是在长程状态转移中失真。
+
+因此，位置锚定和结构非法路径是两类不同但相关的失败。前者说明 answer-level 反事实指标可能被表面序列位置污染；后者说明即使引入 reasoning trace，模型仍可能生成不忠实于图结构的轨迹。本文的评估框架同时捕捉这两类现象：GFI 衡量位置控制前后的 answer-level 虚胖，而 TAC、PathValid 和 ΔIllegal 则衡量 trace-level 的结构忠实性。
+
+---
+
+## 7.6 数据完整性与报告策略
+
+除 DeepSeek-V4-Pro thinking 外，核心 `branching_12hop_N200 + jsoncot_strict` 设置均完成 1600/1600 个任务。DeepSeek-V4-Pro thinking 完成 1599/1600 个任务，剩余 1 个任务超时。我们不对该超时任务进行补跑或人工填充，而是将其作为 timed-out task 报告，并在表格中明确标记为 1599/1600。
+
+该处理方式更保守，也避免了因选择性补跑带来的偏差。由于该设置下完成任务的 Accuracy、PathValid、GoldExact 均为 0.999，且 ΔIllegal 仅为 0.001，单个超时任务不会改变核心结论：thinking 设置可以近乎完全解决该任务，而 no-thinking 或弱模型设置仍存在显著的结构追踪失败。
+
+---
+
+## 7.7 小结
+
+综合来看，实验结果支持三个结论。
+
+第一，严格的 JSON-CoT 提示可以提高输出规范性和 trace-answer consistency，但不能保证路径结构合法。模型能够生成答案与轨迹末节点一致的输出，但轨迹中的中间边仍可能不属于输入图。
+
+第二，prior-control 表明答案不能由节点标签或候选集合直接恢复，模型必须使用边结构才能成功。因此，完整图条件下的表现差异反映的是图结构追踪能力，而不是简单的符号先验。
+
+第三，verifier-retry 能显著提高成功率，但大量剩余失败会反复卡在同一非法跳转处，说明验证反馈只能部分修复结构错误，不能完全创造图跟随能力。
+
+因此，图推理评估不应只检查最终答案，也不应只检查推理轨迹是否与答案一致。对于图路径任务，真正关键的是验证模型生成的每一步状态转移是否忠实于输入图结构。
 
 
 
