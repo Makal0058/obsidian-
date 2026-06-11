@@ -118,107 +118,40 @@ Please retry with a valid k-hop path from the given start node.
 
 ## 4.1 合成图构造（Synthetic Graph Construction）
 
-我们构造合成符号图任务，而不是直接使用自然语言知识图谱。每个节点使用随机符号标识，例如 `J9E9`、`W6S2` 等，以削弱实体名称、常识关联和参数记忆带来的语义先验。这样，模型若要完成任务，主要必须依赖输入中的显式图结构。
+合成符号图中每个节点使用 `J9E9`、`W6S2` 这类随机符号标识，原因不再赘述。每个基础样本由一个起点 $s$、一个跳数 $k$、一条黄金路径 $p^*$ 和一个黄金终点 $y$ 构成，随后，为每个基础样本对应一组反事实图对 $(G_1,G_2)$，每张图包含四种位置控制序列化 endpoint-first \ middle \ last 和 decoy-last。因此，每个基础样本最终展开为 $2\times4=8$ 次模型调用。每个数据集（dataset）包含 N=200 个基础样本，因此每个 dataset 在单一模型和单一 prompt 下包含 $200 \times 2 \times 4 = 1600$ 次调用。本文构造六个图任务数据集，如表所示：
 
-每个基础样本包含一个起点 ($s$)、一个跳数 ($k$)、一条唯一黄金路径 ($p^*$) 和一个黄金终点 ($y$)。模型任务是从 ($s$) 出发，沿图中合法有向边恰好走 ($k$) 跳，并输出最终节点。
-
-对于每个基础样本，构造一组反事实图对：
-
-$$  
-(G_1,G_2),  
-$$
-
-其中两张图共享相同起点 ($s$) 与相同跳数 ($k$)，但拥有不同黄金终点：
-
-$$  
-y_1\neq y_2.  
-$$
-
-每张图进一步生成四种位置控制序列化：
-
-$$  
-\sigma_{\text{first}},  
-\quad  
-\sigma_{\text{middle}},  
-\quad  
-\sigma_{\text{last}},  
-\quad  
-\sigma_{\text{decoy}}.  
-$$
-
-因此，每个基础样本对应：
-
-$$  
-2 \times 4 = 8  
-$$
-
-个模型查询。每个数据集包含 (N=200) 个基础样本，因此每个 dataset 在单一模型和单一 prompt 下包含：
-
-$$  
-200 \times 2 \times 4 = 1600  
-$$
-
-个查询。
-
-本文使用六个主数据集：
-
-|Dataset|Topology|Hop length|Base samples|Queries per model/prompt|
-|---|--:|--:|--:|--:|
-|chain_3hop_N200|Chain|3|200|1600|
-|chain_4hop_N200|Chain|4|200|1600|
-|chain_5hop_N200|Chain|5|200|1600|
-|chain_6hop_N200|Chain|6|200|1600|
-|branching_4hop_N200|Branching|4|200|1600|
-|branching_12hop_N200|Branching|12|200|1600|
+| 数据集（Dataset）         | 拓扑类型（Topology） | 跳数 / 路径长度（Hop length） | 基础样本数（Base samples） | 每个模型/提示下的调用次数（Queries per model/prompt） |
+| -------------------- | -------------: | --------------------: | ------------------: | --------------------------------------: |
+| chain_3hop_N200      |          Chain |                     3 |                 200 |                                    1600 |
+| chain_4hop_N200      |          Chain |                     4 |                 200 |                                    1600 |
+| chain_5hop_N200      |          Chain |                     5 |                 200 |                                    1600 |
+| chain_6hop_N200      |          Chain |                     6 |                 200 |                                    1600 |
+| branching_4hop_N200  |      Branching |                     4 |                 200 |                                    1600 |
+| branching_12hop_N200 |      Branching |                    12 |                 200 |                                    1600 |
 
 ### 4.1.1 链式图（Chain graphs）
 
-Chain graphs 用于检测 answer-only 接口下的 endpoint-position shortcut。在链式图中，从起点到答案存在唯一黄金路径，结构相对简单，因此如果模型表现出较高 Raw GIS 但 PC-GIS 为 0，就能较清楚地说明模型依赖了终点位置，而不是真正稳定地使用图结构。
-
-我们使用 chain-3hop 到 chain-6hop 进行长度扫描。该设置用于观察弱提示下的答案层失败是否随 hop 长度变化，并比较不同模型是否表现出稳定位置捷径、部分捷径依赖或图干预敏感性崩溃。
-
+Chain graphs 用于检测仅答案（answer-only）设置下的终点位置捷径（endpoint-position shortcut）。如果模型表现出较高 Raw GIS，但 PC-GIS 在位置控制后明显降低时，就说明模型的表面图跟随能力可能依赖了终点位置，而非真正使用图结构。同时使用 3 \ 4 \ 5 \ 6 hop 进行长度扫描，观测弱提示下位置依赖是否随 长度变化，比较不同模型的位置依赖程度（稳定、部分依赖或崩溃）。
 ### 4.1.2 分叉图（Branching graphs）
 
-Branching graphs 用于检测路径层状态追踪能力。与链式图不同，分叉图在中间节点处包含多个候选分支，模型不能只依赖最后出现节点或局部显著节点，而必须持续维护当前节点状态，并在每一步选择图中真实存在的后继边。
+与链式图不同，分叉图在中间节点包含多个候选分支，用于检测路径层状态追踪能力，模型不能只依赖最后出现节点或局部显著节点，必须持续维护当前节点状态，并在每一步选择图中真实存在的后继边。branching graphs 使用 4hop 和 12hop 两档难度。branching-4hop 用于与 chain-4hop 对照，控制相同跳数，突出拓扑结构从简单链式读取到分叉状态追踪变化，观察主要错误机制是否由答案层位置依赖转向路径层非法轨迹；branching-12hop 作为主要困难设置，用于考察在更长路径和更多状态更新步骤下，路径层非法轨迹是否成为更主要的失败模式。
+### 4.1.3 图验证（Graph validation）
 
-我们使用 branching-4hop 和 branching-12hop 两档难度。branching-4hop 作为中间难度设置，用于观察从简单链式读取到分叉状态追踪之间的过渡；branching-12hop 作为主要困难设置，用于放大长程状态追踪失败和非法路径生成。
+所有图在进入实验前均通过符号程序验证，只有通过全部检查的样本才进入最终评测。
 
-### 4.1.3 Graph validation
+## 4.2 模型与提示（Models and Prompts）
 
-所有图在进入实验前均通过符号程序验证。验证内容包括：
+### 4.2.1 模型（Models）
 
-1. ($G_1$) 与 ($G_2$) 均包含完整图结构；
-    
-2. 两张图共享相同起点 ($s$) 与跳数 ($k$)；
-    
-3. 两张图的黄金终点不同，即 ($y_1\neq y_2$)；
-    
-4. 每张图中从 ($s$) 出发恰好 ($k$) 跳的黄金终点唯一；
-    
-5. 当前实验设定下黄金路径唯一；
-    
-6. decoy 节点不是合法答案；
-    
-7. 四种位置控制序列化满足 endpoint-first\middle\last 与 decoy-last 的位置约束；
-    
-8. 边列表中不存在破坏唯一性的额外路径。
-    
+本文用于诊断的四个模型配置：
 
-只有通过全部检查的样本才进入最终评测。
-
-## 4.2 Models and Prompts
-
-### Models
-
-本文评估四个主要模型配置：
-
-|Model|Mode|Role|
-|---|---|---|
-|DeepSeek-V4-Flash|no-thinking|低延迟主模型，用于观察位置捷径、非法路径和 verifier-retry 的修复上限|
-|DeepSeek-V4-Pro|no-thinking|更强模型的有限推理预算基线|
-|DeepSeek-V4-Pro|thinking|高推理预算对照，用于检验内部 reasoning budget 是否能解决路径非法问题|
-|Qwen Max|no-thinking|跨模型家族对照，用于检验失败模式是否稳定存在|
-|GPT-5.4-mini|no-thinking|额外闭源模型对照，用于观察位置捷径和路径非法是否跨模型出现|
+| Model             | Mode        | 诊断作用                                    |
+| ----------------- | ----------- | --------------------------------------- |
+| DeepSeek-V4-Flash | no-thinking | 低延迟模型，观察位置捷径、非法路径和 verifier-retry 的缓解效果 |
+| DeepSeek-V4-Pro   | no-thinking | 作为思考模式的消融实验，观察关闭思考模式后图忠实性表现如何变化         |
+| DeepSeek-V4-Pro   | thinking    | 观察思考模式是否缓解答案层与路径层失败                     |
+| Qwen Max          | no-thinking | 开源模型对照，相同任务设置下检验失败模式是否稳定存在              |
+| GPT-5.4-mini      | no-thinking | 闭源模型对照，相同任务设置下检验失败模式是否稳定存在              |
 
 DeepSeek-V4-Pro thinking 只在关键困难设置上运行，即：
 
