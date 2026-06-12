@@ -236,49 +236,21 @@ verifier-retry 仅在 jsoncot_strict 设置下评估，因为该设置要求模�
 
 ## 5.2 弱提示会诱发答案层的位置捷径（Weak prompts induce answer-level positional shortcuts）
 
-本节报告 answer-only 弱提示下的答案层位置捷径结果。总体上，chain graphs 中弱提示会使模型在默认 endpoint-last 序列化下表现出表面图跟随能力，但这种能力在位置控制后明显下降，主要表现为较高 Raw GIS、较低 PC-GIS 和较高 EAR，说明默认序列化中的终点位置线索会显著虚高答案层图忠实性。但随着 chain graphs 路径变长或拓扑结构转换为 branching graphs，部分模型的 GFI 进一步下降，失败形态从 endpoint-position shortcut 逐渐转向整体图干预敏感性不足。
+本节报告答案层的位置依赖实验结果，包括各模型在不同链长和拓扑上的 GFI （位置虚胖）长度扫描，实验揭示了三个主要发现：
 
+第一，chain graphs 图干预敏感性在位置控制后消失，branching 上 $GFI≈0$ 是 Raw GIS 崩塌的结果，非忠实性提高：整体上 chain graphs 中 Raw GIS 往往较高，但 PC-GIS 几乎始终接近 0 导致 GFI 与 Raw GIS 基本重合，表明在 direct_minimal 弱提示下模型表现出的图干预敏感性大多不能在位置控制后保持，多数是终点位置捷径虚胖化；由于位置捷径在分叉图中失效，Raw GIS 本身低，导致 GFI ≈0。这对应 3.3.3 的 caveat：低 GFI 并非虚胖消除，而是 Raw GIS 崩塌的自然结果。branching 上的主要失败转入路径层（见 §5.3）。
+![[Pasted image 20260612135148.png]]
+注：GPT-5.4-mini 在 direct_minimal 下仅评测 chain 拓扑，branching 数据缺失，汇总图应注明该点仅取三模型平均。
 
-接下来分析 answer-only 弱提示是否会诱发答案层位置捷径。我们使用 chain graphs 作为浅层诊断环境，因为链式结构中从起点到终点只有唯一简单路径，若正确终点总被放在显著位置，模型可能不真正沿图推理，而是直接选择最后或最显著的节点。
-![[Pasted image 20260610002354.png]]
-Table 1 显示 chain-4hop + direct_minimal 下的结果。DeepSeek-V4-Flash 的 Raw GIS 达到 68.5%，但 PC-GIS 为 0%，因此 GFI 也达到 68.5%。这说明模型在默认 endpoint-last 条件下看似能随图改变答案，但这种能力完全无法通过位置控制检验。EAR 进一步达到 63.8%，说明当错误诱饵被放在最后时，模型经常被最后位置吸引。
-![[Pasted image 20260609230203.png]]
-Qwen Max 也呈现相同方向：Raw GIS 为 38.0%，PC-GIS 为 0%，GFI 为 38.0%。不过 Qwen 的 EAR 只有 19.7%，说明它并不是单纯稳定地选择最后节点；在更长链上，它更接近图干预敏感性崩溃，即模型对图变化本身逐渐不敏感。
+第二，三模型位置依赖性质不同：DeepSeek-V4-Flash 呈现稳定的位置锚定型：chain 3–6 hop 持续高位虚胖（GFI 0.62–0.93），PC-GIS 全程 ≈0，说明 Raw GIS 几乎完全来自位置线索；GPT-5.4-mini 表现为中间型：chain 3–6 hop 的 GFI 随 hop 单调下降（0.82→0.46），但 PC-GIS 贴地导致二者仍基本重合，说明它同样受到位置线索影响，只是这种位置依赖随 hop 增加缓慢衰减；Qwen Max 则呈现出另一种失败形态：它在 chain-3hop 上仍有较高 Raw GIS 和 GFI，但从 chain-5hop 开始 Raw GIS 已接近 0。此时低 GFI 不能解释为位置锚定被消除，而应解释为图干预敏感性本身崩塌。
+![[Pasted image 20260612135331.png]]![[Pasted image 20260612135315.png]]
+注：GPT-5.4-mini 在 direct_minimal 下仅报告 chain graphs，因此没有 branching EAR 点。
+![[Pasted image 20260612135353.png]]
+第三，EAR 描述模型选择末位诱饵节点的比例，答案层位置锚定的直接证据：在 chain 弱提示下DeepSeek-V4-Flash 的 decoy-last EAR 高达 0.43–0.51，近半数输出直接选择序列末位节点,是赤裸的终点锚定；GPT-5.4-mini 的 EAR 约为 0.37–0.40，低于 DeepSeek-V4-Flash 但相当稳定，表明 GFI 随 hop 增长逐步下降，但仍持续受到末位位置线索影响；Qwen Max 的 EAR 则相对较低（chain-3hop 约 0.30）且随 hop 快速衰减，结合其 Raw GIS 同步崩塌，说明不是位置锚定被消除而是模型已经失去稳定的图干预敏感性。需要强调的是EAR 与 GFI 共享同一逻辑，低 EAR 仅在 Raw GIS 崩塌或位置捷径失效时出现，不能被误读为锚定消除——此时模型既不锚定末位、也未真正沿图推理，必须结合 Raw GIS 是否崩塌来解读，而高 EAR 是位置锚定的充分证据；branching 上 EAR 降至近 0，并非位置锚定被消除而是位置捷径失效后 Raw GIS 整体崩塌的伴随结果。
 
-|Model|Accuracy|Raw GIS|PC-GIS|GFI|EAR|
-|---|--:|--:|--:|--:|--:|
-|DeepSeek-V4-Flash|29.5|68.5 [62.0, 75.0]|0.0 [0.0, 0.0]|68.5 [62.0, 75.0]|63.8 [59.2, 68.2]|
-|Qwen Max|46.1|38.0 [31.5, 45.0]|0.0 [0.0, 0.0]|38.0 [31.5, 45.0]|19.7 [15.8, 23.8]|
+**Finding 2.** 弱 answer-only 提示会诱发答案层的图跟随虚胖：在 chain graphs 中，默认 endpoint-last 序列化下的高 Raw GIS 主要来自 endpoint-position shortcut；但在更长链或分叉拓扑中，Raw GIS 本身可能崩塌，因此 GFI 必须结合 Raw GIS 一起解释。（Weak answer-only prompts induce answer-level false faithfulness: Raw GIS may be high under endpoint-last serialization, but PC-GIS collapses after position control.）
 
-**Table 1.** Chain-4hop under direct_minimal. Raw GIS can be substantially inflated by endpoint-position shortcuts; after position control, PC-GIS collapses to zero.
-
-进一步的 chain 长度扫描显示，不同模型呈现出递进式答案层失败。DeepSeek-V4-Flash 在 chain-3hop 到 chain-6hop 上都保持较高 GFI 与 EAR，说明其弱提示行为稳定受到 endpoint-position shortcut 影响。GPT-5.4-mini 表现为中间型：它也受到位置线索影响，但随 hop 增长逐步下降。Qwen Max 则在较长链上 Raw GIS 急剧降低，说明其主要问题逐渐从位置捷径转向图干预敏感性崩溃。
-
-具体而言，Raw GIS 在 chain-3hop 到 chain-6hop 上呈现如下趋势：
-
-|Hop|DeepSeek-V4-Flash|GPT-5.4-mini|Qwen Max|
-|--:|--:|--:|--:|
-|3|92.5|86.4|85.5|
-|4|68.5|71.0|38.0|
-|5|62.5|63.0|4.0|
-|6|67.2|46.7|3.0|
-
-对应的 EAR 也显示出类似差异：
-
-|Hop|DeepSeek-V4-Flash|GPT-5.4-mini|Qwen Max|
-|--:|--:|--:|--:|
-|3|81.3|44.3|24.0|
-|4|63.8|58.3|19.8|
-|5|75.8|66.3|9.0|
-|6|77.5|62.0|10.5|
-
-这些结果说明，弱提示并不只产生一种失败。DeepSeek-V4-Flash 的失败更像稳定的位置捷径；GPT-5.4-mini 处于中间状态；Qwen Max 在长链上则表现为 sensitivity collapse。仅看 Raw GIS 会把这些不同机制混在一起，而 GFI 与 EAR 能进一步区分它们。
-
-**Finding 2.** Weak answer-only prompts induce answer-level false faithfulness: Raw GIS may be high under endpoint-last serialization, but PC-GIS collapses after position control.
-
----
-
-## 5.3 Structured output removes chain shortcuts but exposes illegal traces
+## 5.3 结构化输出缓解链式位置捷径，但揭示非法轨迹问题（Structured output removes chain shortcuts but exposes illegal traces）
 
 结构化输出显著改变了 chain graphs 上的行为。在 chain-4hop + jsoncot_strict 下，DeepSeek-V4-Flash 几乎完全解决任务，Accuracy、Raw GIS、PC-GIS 和 PathGoldExact 均为 100%。Qwen Max 也达到 99.8% Accuracy、100.0% Raw GIS、98.5% PC-GIS 和 99.8% PathGoldExact。与 direct_minimal 相比，严格结构化输出几乎消除了 chain 上的答案层位置捷径。
 
@@ -667,7 +639,7 @@ repeated_same_hop
 
 ![[Pasted image 20260610002334.png]]
 
-
+![[Pasted image 20260610002354.png]]
 
 
 
@@ -688,7 +660,7 @@ repeated_same_hop
 ![[Pasted image 20260610002119.png]]
 ![[Pasted image 20260610002654.png]]
 
-
+![[Pasted image 20260609230203.png]]
 
 
 
