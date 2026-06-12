@@ -218,29 +218,26 @@ verifier-retry 仅在 jsoncot_strict 设置下评估，因为该设置要求模�
 ---
 # 5 Results
 
-本节报告 GIF 在符号图任务上的主要结果。整体发现可以概括为三点。第一，prior controls 表明模型不能仅凭答案先验或候选偏好完成任务。第二，在 chain graphs 的弱提示条件下，Raw GIS 会被 endpoint-position shortcut 显著虚高；位置控制后，这种表面图跟随能力会崩塌。第三，在 branching graphs 的结构化输出条件下，位置捷径被削弱，但更深层的路径非法问题暴露出来：模型经常生成与答案自洽、但图上非法的路径。
-
-除非特别说明，本节中的比例指标均以百分比报告。
-
+本节报告 GIF 在符号图任务上的主要结果，整体发现可以概括为三点。第一，prior controls 表明 LLM 表现不能由答案先验或候选偏好充分解释；第二，chain graphs 在弱提示条件设置下表现出较高 Raw GIS，但这一表现主要来自终点位置依赖，一旦控制终点位置，表面图跟随能力便明显下降；第三，branching graphs 在结构化输出设置下，位置依赖被削弱，但更深层的非法路径问题暴露出来，即模型常生成答案自洽但图上非法的路径。除非特别说明，本节中比例指标均以百分比报告。
 ![[Pasted image 20260609225610.png]]
+## 5.1 先验控制排除了答案先验的影响（Prior controls rule out answer priors）
 
-## 5.1 Prior controls rule out answer priors
+首先在代表性数据集上进行 prior-only 与 candidate-only prior 控制，包括 chain-4hop、branching-4hop 和 branching-12hop。没有对每一类 chain hop 都单独运行 prior controls 的原因是所有数据集均使用无语义先验的随机符号节点（例如 `J9E9` 或 `W6S2`），答案先验混淆的强度不应随 hop 长度发生显著变化；此外，3 \ 5 \ 6-hop 主要用于 GFI 长度扫描，即考察位置依赖现象如何随路径长度变化，这与 prior control 的目的不同。结果如表所示：在 prior-only 条件下，DeepSeek-V4-Flash 和 Qwen Max 的准确率均为 0%；在 candidate-only prior 条件下，模型准确率也低于或接近随机候选基线。在不给出图结构时，模型几乎不能稳定识别正确终点，因此后续实验中的成功或失败模式不能由答案先验或候选列表偏好单独解释。
 
-首先检查模型是否能够在无图或仅给候选节点的情况下猜中答案。若模型在 prior-only 或 candidate-only prior 条件下已经能稳定输出正确答案，那么主任务上的成功可能来自答案先验、候选偏好或格式偏好，而不是图结构追踪。
+| Dataset                |              Random baseline | DeepSeek-V4-Flash prior-only | Qwen Max prior-only | DeepSeek-V4-Flash candidate-only | Qwen Max candidate-only | Prior controls |
+| ---------------------- | ---------------------------: | ---------------------------: | ------------------: | -------------------------------: | ----------------------: | :------------: |
+| `chain_3hop_N200`      |                            — |                            — |                   — |                                — |                       — |       ❌        |
+| `chain_4hop_N200`      | $\frac{1}{22}\approx 4.55\%$ |                     $0.00\%$ |            $0.00\%$ |                         $2.50\%$ |                $3.00\%$ |       ✅        |
+| `chain_5hop_N200`      |                            — |                            — |                   — |                                — |                       — |       ❌        |
+| `chain_6hop_N200`      |                            — |                            — |                   — |                                — |                       — |       ❌        |
+| `branching_4hop_N200`  | $\frac{1}{28}\approx 3.57\%$ |                     $0.00\%$ |            $0.00\%$ |                         $3.50\%$ |                $1.50\%$ |       ✅        |
+| `branching_12hop_N200` | $\frac{1}{84}\approx 1.19\%$ |                     $0.00\%$ |            $0.00\%$ |                         $0.25\%$ |                $0.00\%$ |       ✅        |
+**Finding 1.** 在代表性符号图数据集上，prior controls 显示模型在无图条件下的表现低于或接近随机候选基线；因此，主结果不能归因于答案先验或候选偏好。（On representative symbolic graph datasets, prior controls indicate that model performance in no-graph settings remains below or comparable to the random candidate baseline. This suggests that the main results cannot be explained by answer priors or candidate-set biases.）
 
-在 branching-12hop 上，prior controls 基本排除了这一解释。prior-only 条件下，DeepSeek-V4-Flash 和 Qwen Max 的准确率均为 0%。candidate-only prior 条件下，DeepSeek-V4-Flash 的准确率为 0.25%，Qwen Max 为 0%。这一结果低于或接近随机候选基线：
+## 5.2 弱提示会诱发答案层的位置捷径（Weak prompts induce answer-level positional shortcuts）
 
-$$  
-\frac{1}{84}\approx 1.19%.  
-$$
+本节报告 answer-only 弱提示下的答案层位置捷径结果。总体上，chain graphs 中弱提示会使模型在默认 endpoint-last 序列化下表现出表面图跟随能力，但这种能力在位置控制后明显下降，主要表现为较高 Raw GIS、较低 PC-GIS 和较高 EAR，说明默认序列化中的终点位置线索会显著虚高答案层图忠实性。但随着 chain graphs 路径变长或拓扑结构转换为 branching graphs，部分模型的 GFI 进一步下降，失败形态从 endpoint-position shortcut 逐渐转向整体图干预敏感性不足。
 
-因此，后续主实验中的成功或失败不能由无图答案先验解释。模型必须利用输入图结构，才可能稳定命中正确终点。
-
-**Finding 1.** Prior controls rule out answer priors: without graph structure, models almost never identify the correct endpoint on branching-12hop.
-
----
-
-## 5.2 Weak prompts induce answer-level positional shortcuts
 
 接下来分析 answer-only 弱提示是否会诱发答案层位置捷径。我们使用 chain graphs 作为浅层诊断环境，因为链式结构中从起点到终点只有唯一简单路径，若正确终点总被放在显著位置，模型可能不真正沿图推理，而是直接选择最后或最显著的节点。
 ![[Pasted image 20260610002354.png]]
