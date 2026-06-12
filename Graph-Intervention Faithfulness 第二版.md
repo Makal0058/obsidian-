@@ -300,7 +300,7 @@ verifier-retry 仅在 jsoncot_strict 设置下评估，因为该设置要求模�
 ## 5.4 两类缓解机制：内部预算推理（思考模式） vs 外部符号反馈（verifier-retry）
 
 前面的结果表明，结构化输出虽然可以缓解简单 chain graphs 上的答案层位置捷径，但在 branching graphs 上暴露出新的轨迹层失败：模型可以生成与最终答案自洽的路径，但这些路径并不一定是输入图上的合法路径。因此，我们进一步比较两类缓解机制：一种是内部缓解，即开启模型的 thinking，让模型用更高推理预算维护图状态；另一种是外部缓解，即使用符号 verifier 检查路径是否合法，并在发现路径长度错误或非法边时触发重试。
-
+![[Pasted image 20260612191859.png]]
 ### 内部缓解：thinking 几乎解决任务，但延迟成本很高
 
 首先比较 DeepSeek-V4-Pro 的 no-thinking 与 thinking 模式。结果显示，thinking 几乎解决 branching-12hop + $\texttt{jsoncot_strict}$，但代价是显著更高的延迟。
