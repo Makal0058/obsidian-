@@ -50,14 +50,18 @@ CoT 提示提升了 LLM 在数学、逻辑和多步推理任务上的表现，�
 
 ## 3.1 任务设定与反事实图对构造
 
-给定有向图 $G=(V,E)$，$V$ 为节点集合，$E\subseteq V\times V$ 为有向边集合，待评测的 LLM 为 $f$。关注一种受控定长多跳图推理任务：给定起跳点 $s\in V$ 和跳数 $k$，模型需从点 $s$ 出发，沿图中合法有向边走 $k$ 跳后输出最终到达的节点。一条长为 $k$ 的合法路径记为 $p^*=(v_0,v_1,\dots,v_k)$，其中 $v_0=s$，$v_k=y$，且对 $\forall i\in{0,\dots,k-1}$，有 $(v_i,v_{i+1})\in E$ 。任务标准答案为路径终点 $y=v_k$。由于 LLM 不能直接处理图 $G$，而是接收图的线性化文本表示。因此定义一个序列化函数 $\sigma_\alpha(G)=(x_1,x_2,\dots,x_n)$。其中 $\alpha$ 表示一种具体的序列化配置，包括节点标号、边顺序、语法格式以及位置控制策略。给定任务指令 $T$（包含起点 $s$、跳数 $k$ 及输出格式要求）和序列化图 $\sigma_\alpha(G)$，模型输出预测终点 $\hat{y}$；在结构化路径提示下，模型还需输出显式路径 $\hat{p}$，即 $f(T,\sigma_\alpha(G))\rightarrow(\hat{p},\hat{y})$；在 answer-only prompt 下，模型只输出预测终点 $\hat{y}$，此时可视为 $\hat{p}=\varnothing$。
+给定有向图 $G=(V,E)$，$V$ 为节点集合，$E\subseteq V\times V$ 为有向边集合，待评测的 LLM 为 $f$。关注一种受控定长多跳图推理任务：给定起跳点 $s\in V$ 和跳数 $k$，模型需从点 $s$ 出发，沿图中合法有向边走 $k$ 跳后输出最终到达的节点。
+
+一条长为 $k$ 的合法路径（Path Valid）记为 $p=(v_0,v_1,\dots,v_k)$，其中 $v_0=s$，$v_k=y$，且对 $\forall i\in{0,\dots,k-1}$，有 $(v_i,v_{i+1})\in E$ ，其终点 $v_k$​ 即为该路径对应的答案。由于 LLM 不能直接处理图 $G$，而是接收图的线性化文本表示。因此定义一个序列化函数 $\sigma_\alpha(G)=(x_1,x_2,\dots,x_n)$。其中 $\alpha$ 表示一种具体的序列化配置，包括节点标号、边顺序、语法格式以及位置控制策略。给定任务指令 $T$（包含起点 $s$、跳数 $k$ 及输出格式要求）和序列化图 $\sigma_\alpha(G)$，模型输出预测终点 $\hat{y}$；在结构化路径提示下，模型还需输出显式路径 $\hat{p}$，即 $f(T,\sigma_\alpha(G))\rightarrow(\hat{p},\hat{y})$；在 answer-only prompt 下，模型只输出预测终点 $\hat{y}$，此时可视为 $\hat{p}=\varnothing$。
 
 答案层为检验模型输出是否真正受图控制，构造反事实图对 $(G_1,G_2)$，两张图共享相同起点 $s$ 和跳数 $k$ ，但对应的合法 $k-hop$ 终点不同$$
 \begin{aligned}
 G_1 &: s \xrightarrow{k\text{ hops}} y_1 \\
 G_2 &: s \xrightarrow{k\text{ hops}} y_2
 \end{aligned}
-$$，其中 $y_1\neq y_2$，且对应的黄金路径分别为 $p_1^* = (s,\dots,y_1), \ \ p_2^* = (s,\dots,y_2)$。如果模型输入真正遵循图结构，则图从 $G_1$ 被干预为 $G_2$ 时，答案也应从 $y_1$ 改为 $y_2$，但这仅是必要条件，模型可能没有沿图推理，而直接利用与图干预同步变化的文本线索。例如，正确终点总是出现在边列表最后。后续位置控制正是为了排除这类混淆。实验中使用随机符号节点消除语义先验，通过无图先验控制（prior-only）和候选项限定的先验控制（candidate-only prior controls）检查无图条件下的固定答案偏好。若模型在无图条件下已经稳定输出某一候选答案，则该样本可能被视为受先验混淆的（prior-confounded）。本文主实验中，prior controls 表明答案先验和候选偏好不能解释主要结果。此外，路径层采用唯一黄金路径设定，给定 $(G,s,k)$，存在一条从 $s$ 出发的唯一合法路径，使得 LLM 恰好走 $k$ 跳到达标准答案 $y$，则将这条路径记为黄金路径 $p^*$，唯一性通过符号枚举验证。需要强调的是，唯一性主要用于定义 Path Gold Exact；路径合法性、TAC 和 FailureHop 并不依赖唯一黄金路径。若需要扩展到多合法路径场景，将单一路径 $p^*$ 扩展为为黄金路径集合 $\mathcal{P}^*=\{(v_0,\dots,v_k)\mid v_0=s,\ v_k=y,\ \forall i\in\{0,\dots,k-1\},\ (v_i,v_{i+1})\in E\}$ 即可。
+$$，其中 $y_1\neq y_2$，且对应的黄金路径分别为 $p_1^* = (s,\dots,y_1), \ \ p_2^* = (s,\dots,y_2)$。如果模型输入真正遵循图结构，则图从 $G_1$ 被干预为 $G_2$ 时，答案也应从 $y_1$ 改为 $y_2$，但这仅是必要条件，模型可能没有沿图推理，而直接利用与图干预同步变化的文本线索。例如，正确终点总是出现在边列表最后。后续位置控制正是为了排除这类混淆。实验中使用随机符号节点消除语义先验，通过无图先验控制（prior-only）和候选项限定的先验控制（candidate-only prior controls）检查无图条件下的固定答案偏好。若模型在无图条件下已经稳定输出某一候选答案，则该样本可能被视为受先验混淆的（prior-confounded）。本文主实验中，prior controls 表明答案先验和候选偏好不能解释主要结果。
+
+此外，在合法路径基础上对每个任务实例施加唯一黄金路径（Path Gold Exact）约束，给定 $(G,s,k)$，存在一条从 $s$ 出发的唯一合法路径，使得 LLM 恰好走 $k$ 跳到达标准答案 $y$，则将这条路径记为黄金路径 $p^*=(v_0,v_1,\dots,v_k)$，其终点 $y=v_k$​ 即为任务标准答案，唯一性通过符号枚举验证。需要强调的是，唯一性主要用于定义 Path Gold Exact；路径合法性、TAC 和 FailureHop 并不依赖唯一黄金路径。若需要扩展到多合法路径场景，将单一路径 $p^*$ 扩展为为黄金路径集合 $\mathcal{P}^*=\{(v_0,\dots,v_k)\mid v_0=s,\ v_k=y,\ \forall i\in\{0,\dots,k-1\},\ (v_i,v_{i+1})\in E\}$ 即可。
 
 ## 3.2 位置控制序列化
 
@@ -77,7 +81,7 @@ Position-Controlled GIS，简称 PC-GIS。对于样本 $j$，定义$\mathrm{PC-G
 Graph-Following Inflation，简称 GFI。对样本 $j$，定义 $\mathrm{GFI}^{(j)}=\mathrm{RawGIS}^{(j)}-\mathrm{PCGIS}^{(j)}$，衡量 Raw GIS 与 PC-GIS 之间的差距，当 Raw GIS 较高而 PC-GIS 较低时，GFI 会升高，说明输出看似随图干预改变答案，但这种表面敏感性很可能依赖终点位置锚定：一旦正确终点不再稳定处于显著位置，模型就无法稳定输出图结构决定的答案，本文将这种现象称为图跟随虚胖，即模型的表面图敏感性被终点位置等文本捷径高估。需要注意的是，GFI 的解释必须以 Raw GIS 为前提，若 Raw GIS 本身已经很低，则模型在默认条件下已经不能稳定随图改变答案，此时不应把低 GFI 解读为位置锚定被消除，而应怀疑图干预敏感性崩塌。同上，数据集层面的 GFI 定义为 $\mathrm{GFI}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{GFI}^{(j)}$。
 ### 3.3.4 终点锚定率（Endpoint Anchoring Rate)
 
-为直接测量模型是否被显著位置吸引，GIF 还报告干扰项后置终点锚定率（decoy-last Endpoint Anchoring Rate），简称 EAR。沿用 3.2 decoy-last 设定，记 $d^{(j)}$ 为第 $j$ 个样本中被放置在序列末尾的诱饵节点，定义样本级 decoy-last EAR 为 $\mathrm{EAR}_{\mathrm{decoy}}^{(j)}=\mathbb{1}\!\left[\hat{y}_{\mathrm{decoy}}^{(j)}=d^{(j)}\right]$，其中 ($\hat{y}_{\text{decoy}}^{(j)}$) 表示模型在 decoy-last 条件下的输出答案，类似的，数据集层面 $\mathrm{EAR}_{\mathrm{decoy}}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{EAR}_{\mathrm{decoy}}^{(j)}$。相比 endpoint-last，decoy-last EAR 能更直接的识别终点位置锚定，因为 endpoint-last 中最后出现节点就是正确答案，因此模型输出该节点可能因为模型真正实现图跟随，也可能是末位位置捷径；而在 decoy-last 中，最后出现节点被替换为错误诱饵 $d^{(j)}$，将正确答案与末位位置线索解耦。若模型仍输出 $d$，则说明其更可能依赖“最后出现节点”这一文本位置线索。
+为直接测量模型是否被显著位置吸引，GIF 还报告干扰项后置终点锚定率（decoy-last Endpoint Anchoring Rate），简称 EAR。沿用 3.2 decoy-last 设定，记 $d^{(j)}$ 为第 $j$ 个样本中被放置在序列末尾的诱饵节点，定义样本级 EAR 为 $\mathrm{EAR}_{\mathrm{decoy}}^{(j)}=\mathbb{1}\!\left[\hat{y}_{\mathrm{decoy}}^{(j)}=d^{(j)}\right]$，其中 ($\hat{y}_{\text{decoy}}^{(j)}$) 表示模型在 decoy-last 条件下的输出答案，类似的，数据集层面 $\mathrm{EAR}_{\mathrm{decoy}}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{EAR}_{\mathrm{decoy}}^{(j)}$。相比 endpoint-last，EAR 能更直接的识别终点位置锚定，因为 endpoint-last 中最后出现节点就是正确答案，因此模型输出该节点可能因为模型真正实现图跟随，也可能是末位位置捷径；而在 decoy-last 中，最后出现节点被替换为错误诱饵 $d^{(j)}$，将正确答案与末位位置线索解耦。若模型仍输出 $d$，则说明其更可能依赖“最后出现节点”这一文本位置线索。
 
 ## 3.4 路径层指标：TAC、PathValid、PathGoldExact 与 FailureHop
 
@@ -94,7 +98,7 @@ Trace-Answer Consistency，简称 TAC，定义 $\mathrm{TAC}(\hat{p},\hat{y})=\m
 定义路径层诊断的核心信号非法路径差距 $\Delta_{\text{illegal}}$，其中 $\Delta_{\text{illegal}}=\mathrm{TAC}-\mathrm{Path\ Valid}$，用于量化“轨迹自洽但图上非法”的失败模式，TAC 较高而 PathValid 较低时 $\Delta_{\text{illegal}}$ 增大，此时模型生成与答案一致但不是图上的合法路径的结构化轨迹，即 $\mathrm{TAC}=1 \nRightarrow \mathrm{PathValid}=1$。
 ### 3.4.4 黄金路径完全匹配（Path Gold Exact）
 
-定义黄金路径完全匹配（Path Gold Exact），在 3.1 的唯一黄金路径设定下,定义，即 $\mathrm{Path\ Gold\ Exact}\ (\hat{p},p^*)=\mathbb{1}\!\left[\hat{p}=p^*\right]$。
+定义黄金路径完全匹配（Path Gold Exact），在 3.1 的唯一黄金路径设定下，定义 $\mathrm{Path\ Gold\ Exact}\ (\hat{p},p^*)=\mathbb{1}\!\left[\hat{p}=p^*\right]$，唯一黄金路径是 $p^*$ 本身；Path Gold Exact 是检查 $\hat{p}$​ 是否等于 $p^*$ 的指标。
 ### 3.4.5 首次失败跳数（FailureHop）
 
 为了定位模型从哪一步开始偏离图结构，将颗粒度从路径细化为第几跳，引入 $\operatorname{FailureHop}\ (\hat{p},G)=\min\left\{i\in\{1,\dots,k\}:(\hat{v}_{i-1},\hat{v}_i)\notin E\right\}$，FailureHop 只定义非法边位置，若路径长度足够且起点正确，则 FailureHop 记录第一条非法边所在的 hop；若全部边均合法，则 FailureHop 记为 pass；错误类型（长度 \ 起点 \ 格式 \ 非法边)单独作为 error type 记录。FailureHop 对于分析分叉图尤其重要，因为模型可能反复在早期分叉点、终端转移或特定状态更新位置失败。
@@ -118,7 +122,7 @@ Please retry with a valid k-hop path from the given start node.
 
 ## 4.1 合成图构造（Synthetic Graph Construction）
 
-合成符号图中每个节点使用 `J9E9`、`W6S2` 这类随机符号标识，原因不再赘述。每个基础样本由一个起点 $s$、一个跳数 $k$、一条黄金路径 $p^*$ 和一个黄金终点 $y$ 构成，随后，为每个基础样本对应一组反事实图对 $(G_1,G_2)$，每张图包含四种位置控制序列化 endpoint-first \ middle \ last 和 decoy-last。因此，每个基础样本最终展开为 $2\times4=8$ 次模型调用。每个数据集（dataset）包含 N=200 个基础样本，因此每个 dataset 在单一模型和单一 prompt 下包含 $200 \times 2 \times 4 = 1600$ 次调用。本文构造六个图任务数据集，如表所示：
+合成符号图中每个节点使用 `J9E9`、`W6S2` 这类随机符号标识，原因不再赘述。每个基础样本由一个起点 $s$、一个跳数 $k$、一条黄金路径 $p^*$ 和一个黄金终点 $y$ 构成，随后，为每个基础样本对应一组反事实图对 $(G_1,G_2)$，每张图包含四种位置控制序列化 endpoint-first \ middle \ last 和 decoy-last。因此，每个基础样本最终展开为 $2\times4=8$ 次模型调用。每个数据集（dataset）包含 N=200 个基础样本，因此每个 dataset 在单一模型和单一 prompt 下包含 $200 \times 8 = 1600$ 次调用。本文构造六个图任务数据集，如表所示：
 
 | 数据集（Dataset）         | 拓扑类型（Topology） | 跳数 / 路径长度（Hop length） | 基础样本数（Base samples） | 每个模型/提示下的调用次数（Queries per model/prompt） |
 | -------------------- | -------------: | --------------------: | ------------------: | --------------------------------------: |
@@ -131,11 +135,14 @@ Please retry with a valid k-hop path from the given start node.
 
 ### 4.1.1 链式图（Chain graphs）
 
-Chain graphs 用于检测仅答案（answer-only）设置下的终点位置捷径（endpoint-position shortcut）。如果模型表现出较高 Raw GIS，但 PC-GIS 在位置控制后明显降低时，就说明模型的表面图跟随能力可能依赖了终点位置，而非真正使用图结构。同时使用 3 \ 4 \ 5 \ 6 hop 进行长度扫描，观测弱提示下位置依赖是否随 长度变化，比较不同模型的位置依赖程度（稳定、部分依赖或崩溃）。
+Chain graphs 用于检测仅答案（answer-only）设置下的终点位置捷径（endpoint-position shortcut）。如果模型表现出较高 Raw GIS，但 PC-GIS 在位置控制后明显降低时，就说明模型的表面图跟随能力可能依赖了终点位置，而非真正使用图结构。同时使用 3 \ 4 \ 5 \ 6 hop 进行长度扫描，观测弱提示下位置依赖是否随长度变化，比较不同模型的位置依赖程度（稳定、部分依赖或崩溃）。
 ### 4.1.2 分叉图（Branching graphs）
 
-与链式图不同，分叉图在中间节点包含多个候选分支，用于检测路径层状态追踪能力，模型不能只依赖最后出现节点或局部显著节点，必须持续维护当前节点状态，并在每一步选择图中真实存在的后继边。branching graphs 使用 4hop 和 12hop 两档难度。branching-4hop 用于与 chain-4hop 对照，控制相同跳数，突出拓扑结构从简单链式读取到分叉状态追踪变化，观察主要错误机制是否由答案层位置依赖转向路径层非法轨迹；branching-12hop 作为主要困难设置，用于考察在更长路径和更多状态更新步骤下，路径层非法轨迹是否成为更主要的失败模式。
-### 4.1.3 图验证（Graph validation）
+与链式图不同，分叉图在中间节点包含多个候选分支，用于检测路径层状态追踪能力，模型不能只依赖最后出现节点或局部显著节点，必须持续维护当前节点状态，并在每一步选择图中真实存在的后继边。branching graphs 使用 4hop 和 12hop 两档难度。branching-4hop 用于与 chain-4hop 对照，控制相同跳数，突出拓扑结构从简单链式路径跟随到分叉状态追踪的转变，观察主要错误机制是否由答案层位置依赖转向路径层非法轨迹；branching-12hop 作为主要困难设置，用于考察在更长路径和更多状态更新步骤下，路径层非法轨迹是否成为更主要的失败模式。
+### 4.1.3 汇聚图（Converging graph）
+
+汇聚图天然有多条合法路径到同一终点 $y$，会破坏本文的核心路径指标唯一黄金路径；此外，汇聚图主要考察多路径下模型是否存在混淆\选错分支汇合点，这是另一个关于路径歧义消解的研究问题，并非本文研究问题，因此本文将汇聚图留作未来工作，用于多路径扩展，当前刻意用唯一路径换干净判据。
+### 4.1.4 图验证（Graph validation）
 
 所有图在进入实验前均通过符号程序验证，只有通过全部检查的样本才进入最终评测。
 
@@ -152,228 +159,61 @@ Chain graphs 用于检测仅答案（answer-only）设置下的终点位置捷�
 | DeepSeek-V4-Pro   | thinking    | 观察思考模式是否缓解答案层与路径层失败                     |
 | Qwen Max          | no-thinking | 开源模型对照，相同任务设置下检验失败模式是否稳定存在              |
 | GPT-5.4-mini      | no-thinking | 闭源模型对照，相同任务设置下检验失败模式是否稳定存在              |
-
-DeepSeek-V4-Pro thinking 只在关键困难设置上运行，即：
-
-$$\text{branching-12hop} + \text{jsoncot\_strict}$$
-
-该设置用于回答：额外内部推理预算是否能显著提高路径合法性，以及这种提升需要多高延迟成本。
-
-verifier-retry 也只在困难设置上运行：
-
-$$  
-\text{branching-12hop} + \text{jsoncot\_strict},\quad K=5.  
-$$
-
-该设置用于回答：外部符号验证能否在低于 thinking mode 的延迟下部分修复非法路径，以及其收益是否依赖底座模型本身的图跟随能力。
-
-### Prompt interfaces
+需要说明的是，GPT-5.4-mini 结果来自第三方 OpenAI-compatible 中转服务，因此本文按由服务商路由的模型配置（provider-routed model configuration）报告该结果，而不将其等同于官方 API 配置。此外，不同模型接口对结构化输出的支持并不完全一致。GPT-5.4-mini 的部分调用使用了 API 级 JSON 输出约束（`response_format: {"type": "json_object"}`），而 DeepSeek 和 Qwen 的对应调用主要依赖 prompt 约束输出格式。因此，跨模型比较 format failure 或 parse failure 时需谨慎；GPT-5.4-mini 较低的格式失败率可能部分来自接口级 JSON 约束，而不完全反映模型自身的格式遵循能力。本文的主要跨模型比较聚焦于答案层和路径层图推理指标，对格式相关指标仅作辅助诊断。
+### 4.2.2 提示接口（Prompt interfaces）
 
 本文使用五类 prompt，其中前三类用于主任务，后两类用于 prior control。
 
-|Prompt|Output|Purpose|
-|---|---|---|
-|direct_minimal|answer only|检测 answer-only 接口下的 endpoint-position shortcut|
-|jsoncot_basic|JSON path + answer|观察显式路径输出是否降低位置锚定，并开启路径级诊断|
-|jsoncot_strict|strict JSON path + answer|强制路径长度、起点、逐边合法性和 answer-path consistency 的结构化输出格式|
-|prior_only|answer only, no graph|检查无图条件下的固定答案先验|
-|candidate_only_prior|answer only, candidates but no graph|检查候选集合偏好是否能解释答案命中|
+| 提示（Prompt）                      | 输出格式（Output）                                      | 设计目的（Purpose）                                  |
+| ------------------------------- | ------------------------------------------------- | ---------------------------------------------- |
+| 直接最简提示（direct_minimal）          | 仅答案（answer only）                                  | 检测仅答案输出设置下的终点位置捷径（endpoint-position shortcut）  |
+| 基础 JSON-CoT 提示（jsoncot_basic）   | JSON 路径 + 答案（JSON path + answer）                  | 观察显式路径输出是否降低位置锚定，并使路径层诊断成为可能                   |
+| 严格 JSON-CoT 提示（jsoncot_strict）  | 严格 JSON 路径 + 答案（strict JSON path + answer）        | 约束路径长度、起点、逐边合法性和轨迹-答案一致性（TAC），用于减少格式错误并暴露路径层失败 |
+| 纯先验提示（prior_only）               | 仅答案，无图（answer only, no graph）                     | 检查无图条件下是否存在固定答案先验                              |
+| 候选项限定先验提示（candidate_only_prior） | 仅答案，有候选项但无图（answer only, candidates but no graph） | 检查候选集合本身是否引入固定答案偏好                             |
 
-`direct_minimal` 只要求模型输出最终答案，不要求给出路径。因此，该 prompt 主要用于答案层指标，包括 Accuracy、Raw GIS、PC-GIS、GFI 和 decoy-last EAR。
+`direct_minimal` 只要求模型输出最终预测终点，不要求给出路径。因此，该 prompt 主要用于答案层指标，包括 Raw GIS、PC-GIS、GFI 和 EAR。
 
-`jsoncot_basic` 要求模型输出 JSON 格式的路径与最终答案，例如：
-
+`jsoncot_basic` 要求模型输出 JSON 格式的路径与最终预测终点，例如：
 ```json
 {
   "path": ["S0", "...", "Y"],
   "answer": "Y"
 }
 ```
-
 该设置让路径级指标可被计算，包括 TAC、PathValid、PathGoldExact 和 FailureHop。
 
-`jsoncot_strict` 在 `jsoncot_basic` 基础上加入更严格的格式约束。模型必须输出严格 JSON，不得包含额外文本；路径必须包含 ($k+1$) 个节点，必须从起点 ($s$) 开始，答案必须等于路径最后一个节点。需要注意的是，这些约束只规定输出格式，并不保证模型实际生成的每条边都属于输入图。因此，所有结构化输出仍需进行符号路径验证。
+`jsoncot_strict` 在 `jsoncot_basic` 基础上加入更严格的格式约束。模型必须输出严格 JSON，不得包含额外文本；路径应包含 ($k+1$) 个节点，应从起点 $s$ 开始，预测终点应等于路径最后一个节点。需要注意的是，这些约束只是提示层面的格式与结构要求，并不保证模型实际生成的每条边都属于输入图。因此，所有结构化输出仍需进行符号路径验证。
 
-`prior_only` 和 `candidate_only_prior` 不提供完整图结构，用于排除答案先验和候选偏好。若模型在无图或仅候选条件下已经能稳定命中正确答案，则相应样本可能被视为 prior-confounded，并从主分析中剔除或单独报告。
+`prior_only` 和 `candidate_only_prior` 不提供完整图结构，用于排除答案先验和候选集合偏好。若模型在无图或仅候选条件下已经稳定命中正确答案，则说明该样本可能受到 prior confounding 影响；本文将这些控制结果单独报告，用于判断主实验结果是否可由答案先验或候选偏好解释。
+### 4.2.3 解码配置（Decoding configuration）
 
-### Decoding configuration
+非 retry 主实验使用确定性解码，全程$temperature=0$；对于 verifier-retry，仅第一次尝试使用 $temperature=0$，若路径未通过符号验证器，则后续 retry 使用 temperature=0.3，以减少模型在确定性解码下重复生成同一结构错误的情况。因此，verifier-retry 结果包含一定解码随机性（decoding randomness）。本文对 verifier-retry 进行多次独立运行，并报告 pass@K 与累计延迟的均值。
 
-所有主实验使用确定性解码：
+## 4.3 评估与统计（Evaluation and Statistics）
 
-$$  
-\text{temperature}=0.  
-$$
+### 4.3.1 答案层评估（Answer-level evaluation）
 
-若某些模型 API 不暴露 temperature 控制，则使用 provider 默认确定性设置，并在实验记录中标注。所有请求记录模型名称、prompt mode、dataset、serialization variant、latency、parse status、timeout status 和原始输出路径。
+评估使用第 3 节定义的指标：Raw GIS、PC-GIS、GFI、EAR，其中 Raw GIS 和 PC-GIS 按反事实图对逐样本配对计算；GFI 先在样本级计算，再在数据集层面平均；EAR 则按 decoy-last 输入实例计算，最后在数据集层面平均。
+### 4.3.2 路径层评估（Path-level evaluation）
 
-## 4.3 Evaluation and Statistics
-
-### Output parsing
-
-对于 answer-only prompt，我们解析模型输出中的最终答案 ($\hat{a}$)。若模型输出多个候选或无法定位唯一答案，则记为 parse failure。
-
-对于 structured prompt，我们解析：
-
-$$  
-(\hat{p},\hat{a}).  
-$$
-
-其中 ($\hat{p}$) 为模型输出路径，($\hat{a}$) 为模型最终答案。若 JSON 无法解析、缺少必要字段、路径不是 list、节点格式不合法，或输出包含无法恢复的额外文本，则记为 format failure。format failure 在路径级指标中视为无效路径，并在错误类型统计中单独记录。
-
-### Answer-level evaluation
-
-答案层评估使用第 3 节定义的指标：
-
-- Accuracy；
-    
-- Raw GIS；
-    
-- PC-GIS；
-    
-- GFI；
-    
-- decoy-last EAR。
-    
-
-Raw GIS 和 PC-GIS 在同一批反事实图对上逐样本配对计算。GFI 在样本级先计算：
-
-$$  
-\mathrm{GFI}^{(j)}=\mathrm{RawGIS}^{(j)}-\mathrm{PCGIS}^{(j)},  
-$$
-
-再在数据集层面取平均。
-
-### Path-level evaluation
-
-路径层评估使用第 3 节定义的指标：
-
-- TAC；
-    
-- PathValid；
-    
-- PathGoldExact；
-    
-- ($\Delta_{\text{illegal}}$)；
-    
-- FailureHop；
-    
-- error type distribution。
-    
-
-TAC 检查答案是否等于路径末节点；PathValid 检查路径是否从起点出发、长度是否为 ($k+1$)、每条边是否存在于输入图中；PathGoldExact 检查路径是否完全等于唯一黄金路径；FailureHop 记录第一条非法边所在的 hop。
-
-对于路径过短、路径过长、起点错误、格式错误和 trace-answer mismatch，分别记录对应错误类型。对于路径长度足够且起点正确但某一步边不存在的输出，记录为：
-
+路径层评估使用第 3 节定义的指标：TAC、Path Gold Exact、$\Delta_{\text{illegal}}$、FailureHop、error type distribution。其中 Path Gold Exact 作为路径正确率的主报告指标（检查是否完全等于唯一黄金路径 $p^*$），原因是在唯一黄金路径设定下，Path Valid 蕴含 Path Gold Exact（合法且长度正确的 $k$ 跳路径必为唯一的 $p^*$），因此本文以 Path Gold Exact 作为路径正确性的报告指标，主表不再单独报告 Path Valid；其余指标用于诊断而非报告，具体而言，TAC 检查答案是否等于输出路径末节点；$\Delta_{\text{illegal}}$=TAC−Path Valid 量化“自洽但非法”轨迹（其中 Path Valid 检查起点、长度与逐边合法性）；FailureHop 记录第一条非法边所在的 hop；对于路径过短、路径过长、起点错误、格式错误和轨迹-答案不一致，分别记录对应错误类型；对于路径长度足够且起点正确但某一步边不存在的输出，记录为：
 ```text
 illegal_edge_at_hop_i
 ```
+其中 $i$ 表示第一条非法边所在 hop。
+### 4.3.3 验证器重试评估（Verifier-retry evaluation）
 
-其中 ($i$) 表示第一条非法边所在 hop。
+verifier-retry 仅在 jsoncot_strict 设置下评估，因为该设置要求模型输出结构化路径与预测终点。对于达到最大预算后仍失败的样本，本文统计最终 error type、最终 FailureHop 分布以及 repeated_same_hop 比例。repeated_same_hop 表示模型在多次 retry 中反复失败于同一 hop，用于判断剩余失败是否呈现稳定的结构瓶颈。verifier-retry 结果对 DeepSeek-V4-Flash 报告 3 次独立运行的平均值；对 Qwen Max 报告 2 次独立运行的平均值。
+### 4.3.4 置信区间（Confidence intervals）
 
-### Verifier-retry evaluation
+本文默认报告 95% confidence intervals，对于非 retry 主实验，所有模型调用均使用确定性解码 $temperature=0$，因此 bootstrap 置信区间主要反映由测试样本选择带来的不确定性，而不反映解码随机性。除特别说明外，所有 bootstrap 置信区间均使用 $B=10{,}000$ 次重采样，并采用 percentile bootstrap，即取 bootstrap 分布的第 2.5 和第 97.5 百分位作为区间端点。对于 Raw GIS、PC-GIS 和 GFI 等反事实配对指标，本文使用 paired bootstrap。具体而言，以基础反事实图对为重采样单位；在每个 bootstrap 重采样集合内，重新计算 Raw GIS、PC-GIS，并由二者差值得到 GFI。对于 TAC、Path Gold Exact 和 $\Delta_{\text{illegal}}$ 等指标，本文使用 sample-level bootstrap，以样本为单位重采样，并在每个重采样集合内重新计算对应比例指标。对于 verifier-retry，由于第一次尝试使用 $temperature=0$，后续 retry 使用 $temperature=0.3$，结果同时受到样本选择和解码随机性的影响；本文对每个 run 和每个重试预算 $K$，分别计算 $\mathrm{pass@}K$ 和累计平均延迟 $L^{(K)}$。最终报告 run-level 均值，并使用不同 run 之间的波动反映 retry 阶段的解码随机性。若对 verifier-retry 报告 bootstrap 区间，则该区间仅表示给定 run 内的样本级不确定性；跨 run 的均值和波动用于补充刻画解码随机性。
+### 4.3.5 延迟与超时处理（Latency and timeout handling）
 
-verifier-retry 实验在 branching-12hop + jsoncot_strict 上运行，最大重试次数为：
+所有模型调用均记录端到端 wall-clock latency，即从请求发出到模型返回完整响应或触发超时之间的耗时。对于普通推理，latency 记录单次请求耗时；对于 verifier-retry，记录每次尝试的耗时 $\ell_{j,t}$​，并在不同重试预算 $K$ 下计算样本级累计延迟。若第 $j$ 个样本在第 $\tau_j$​ 次尝试首次通过验证，则其在预算 $K$ 下的累计延迟为 $L_j^{(K)}=\sum_{t=1}^{\min(\tau_j,K)}\ell_{j,t}$；若所有 $K$ 次尝试均未通过验证，则累计前 $K$ 次尝试的耗时。若请求超过预设 timeout，则记为 timed_out。timeout 输出不计为正确答案，也不计为合法路径；在路径层评估中视为无效输出，并在错误统计中单独报告。对于 verifier-retry，timeout 的单次尝试视为失败尝试，并计入对应预算下的累计延迟。延迟分析报告平均值、中位数和高分位数，并单独报告 timeout rate，以避免少数极端慢请求掩盖整体趋势。
+### 4.3.6 可复现性（Reproducibility）
 
-$$  
-K=5.  
-$$
-
-每次尝试后，符号验证器检查输出格式、路径起点、路径长度、逐边合法性以及 answer-path consistency。若验证失败，验证器只返回结构性错误反馈，例如非法边所在 hop 或路径长度错误，不泄露 gold answer 或正确下一跳。
-
-对每个样本记录：
-
-- 每次尝试的输出路径与答案；
-    
-- 每次尝试的 latency；
-    
-- 每次尝试的 verifier pass/fail；
-    
-- 每次失败的 FailureHop；
-    
-- 每次失败的 error type；
-    
-- 第一次通过验证的尝试编号 ($\tau_j$)。
-    
-
-报告 $pass@K$：
-
-$$  
-\mathrm{pass@}K
-
-\frac{1}{N}  
-\sum_{j=1}^{N}  
-\mathbb{1}[\tau_j\le K].  
-$$
-
-同时报告每个 ($K$) 档的累计平均延迟：
-
-$$  
-L^{(K)}
-
-\frac{1}{N}  
-\sum_{j=1}^{N}  
-\sum_{t=1}^{\min(\tau_j,K)}  
-\ell_{j,t},  
-$$
-
-其中 ($\ell_{j,t}$) 是第 ($j$) 个样本第 ($t$) 次尝试的延迟。若样本在 ($K$) 次内未通过验证，则累计全部 ($K$) 次尝试。
-
-对于 ($K=5$) 后仍失败的样本，我们统计最终 FailureHop 分布、最终 error type 分布，以及 repeated_same_hop 比例。repeated_same_hop 表示模型在多次 retry 中反复失败于同一 hop，用于判断剩余失败是否为稳定结构瓶颈。
-
-verifier-retry 结果对 DeepSeek-V4-Flash 报告 3 次独立运行的平均值；对 Qwen Max 报告 2 次独立运行的平均值。误差棒或置信区间基于这些重复运行和样本级统计计算。
-
-### Confidence intervals
-
-对主实验中的样本级指标报告 bootstrap 置信区间。由于模型调用使用确定性解码，bootstrap 反映的是样本选择带来的不确定性，而不是 decoding randomness。
-
-对 Raw GIS、PC-GIS、GFI 等配对指标，使用 paired bootstrap：以基础反事实图对为单位重采样，并在每个重采样集合内重新计算指标。对 Accuracy、TAC、PathValid、PathGoldExact、($\Delta_{\text{illegal}}$) 等样本级比例指标，使用 sample-level bootstrap。
-
-本文默认使用 95% confidence intervals。对于 verifier-retry 的 pass@K 和 latency 曲线，报告多 run 均值，并在图中显示运行间误差或样本级不确定性。
-
-### Latency and timeout handling
-
-所有模型调用记录 wall-clock latency。对于普通推理，latency 记录单次请求耗时；对于 verifier-retry，latency 记录每次尝试的耗时，并累计至通过验证或达到最大重试次数 ($K$)。
-
-若请求超过预设 timeout，则记为 timed_out。timeout 输出不计为正确答案，也不计为合法路径；在路径级指标中视为无效输出，并在错误统计中单独保留。latency 分析报告平均值、中位数和高分位数，以避免少数极端慢请求掩盖整体趋势。
-
-### Reproducibility
-
-所有实验保存以下信息：
-
-- dataset name；
-    
-- sample id；
-    
-- graph id；
-    
-- model name；
-    
-- prompt mode；
-    
-- serialization variant；
-    
-- gold answer；
-    
-- gold path；
-    
-- model output；
-    
-- parsed answer；
-    
-- parsed path；
-    
-- parse status；
-    
-- metric values；
-    
-- latency；
-    
-- timeout status；
-    
-- verifier feedback and retry history, when applicable。
-    
-
-图生成器、序列化脚本、输出解析器和符号 verifier 均使用同一套节点与边表示，以避免评估阶段出现格式不一致。所有主结果均基于通过图结构校验的数据集计算。
+所有模型调用均保存任务元信息、模型配置、原始输出和运行状态。任务元信息包括 dataset name、task id、sample id、topology、hop、start node、graph side、serialization variant、gold answer、gold path、decoy node 以及输入图边列表。模型配置包括 provider、model name、model tag、thinking type、prompt mode 和 decoding temperature。每次调用还记录 raw model output、request success、latency、token usage 和 timeout status。模型输出解析与指标计算在离线评估阶段完成。评估文件保存 parsed answer、parsed path、parse status、answer correctness、last-node anchoring、decoy-last EAR 标记、path error type、PathValid、TAC、PathGoldExact 和 FailureHop 等任务级字段，并进一步汇总为 setting-level、sample-level 和 bootstrap confidence interval 结果。对于 verifier-retry 实验，记录每个任务在不同重试预算 $K$ 下的 pass/fail 状态、累计延迟、attempts used、最终 error type 和最终 FailureHop。对于达到最大预算后仍失败的样本，额外统计 error type 序列、FailureHop 序列、repeated_same_error 和 repeated_same_hop，用于分析剩余失败是否呈现稳定结构瓶颈。图生成器、序列化脚本、输出解析器和符号 verifier 均使用同一套节点与边表示。所有主结果均基于通过图结构校验的数据集计算。
 
 ---
 # 5 Results
@@ -404,18 +244,18 @@ $$
 
 接下来分析 answer-only 弱提示是否会诱发答案层位置捷径。我们使用 chain graphs 作为浅层诊断环境，因为链式结构中从起点到终点只有唯一简单路径，若正确终点总被放在显著位置，模型可能不真正沿图推理，而是直接选择最后或最显著的节点。
 ![[Pasted image 20260610002354.png]]
-Table 1 显示 chain-4hop + direct_minimal 下的结果。DeepSeek-V4-Flash 的 Raw GIS 达到 68.5%，但 PC-GIS 为 0%，因此 GFI 也达到 68.5%。这说明模型在默认 endpoint-last 条件下看似能随图改变答案，但这种能力完全无法通过位置控制检验。decoy-last EAR 进一步达到 63.8%，说明当错误诱饵被放在最后时，模型经常被最后位置吸引。
+Table 1 显示 chain-4hop + direct_minimal 下的结果。DeepSeek-V4-Flash 的 Raw GIS 达到 68.5%，但 PC-GIS 为 0%，因此 GFI 也达到 68.5%。这说明模型在默认 endpoint-last 条件下看似能随图改变答案，但这种能力完全无法通过位置控制检验。EAR 进一步达到 63.8%，说明当错误诱饵被放在最后时，模型经常被最后位置吸引。
 ![[Pasted image 20260609230203.png]]
-Qwen Max 也呈现相同方向：Raw GIS 为 38.0%，PC-GIS 为 0%，GFI 为 38.0%。不过 Qwen 的 decoy-last EAR 只有 19.7%，说明它并不是单纯稳定地选择最后节点；在更长链上，它更接近图干预敏感性崩溃，即模型对图变化本身逐渐不敏感。
+Qwen Max 也呈现相同方向：Raw GIS 为 38.0%，PC-GIS 为 0%，GFI 为 38.0%。不过 Qwen 的 EAR 只有 19.7%，说明它并不是单纯稳定地选择最后节点；在更长链上，它更接近图干预敏感性崩溃，即模型对图变化本身逐渐不敏感。
 
-|Model|Accuracy|Raw GIS|PC-GIS|GFI|decoy-last EAR|
+|Model|Accuracy|Raw GIS|PC-GIS|GFI|EAR|
 |---|--:|--:|--:|--:|--:|
 |DeepSeek-V4-Flash|29.5|68.5 [62.0, 75.0]|0.0 [0.0, 0.0]|68.5 [62.0, 75.0]|63.8 [59.2, 68.2]|
 |Qwen Max|46.1|38.0 [31.5, 45.0]|0.0 [0.0, 0.0]|38.0 [31.5, 45.0]|19.7 [15.8, 23.8]|
 
 **Table 1.** Chain-4hop under direct_minimal. Raw GIS can be substantially inflated by endpoint-position shortcuts; after position control, PC-GIS collapses to zero.
 
-进一步的 chain 长度扫描显示，不同模型呈现出递进式答案层失败。DeepSeek-V4-Flash 在 chain-3hop 到 chain-6hop 上都保持较高 GFI 与 decoy-last EAR，说明其弱提示行为稳定受到 endpoint-position shortcut 影响。GPT-5.4-mini 表现为中间型：它也受到位置线索影响，但随 hop 增长逐步下降。Qwen Max 则在较长链上 Raw GIS 急剧降低，说明其主要问题逐渐从位置捷径转向图干预敏感性崩溃。
+进一步的 chain 长度扫描显示，不同模型呈现出递进式答案层失败。DeepSeek-V4-Flash 在 chain-3hop 到 chain-6hop 上都保持较高 GFI 与 EAR，说明其弱提示行为稳定受到 endpoint-position shortcut 影响。GPT-5.4-mini 表现为中间型：它也受到位置线索影响，但随 hop 增长逐步下降。Qwen Max 则在较长链上 Raw GIS 急剧降低，说明其主要问题逐渐从位置捷径转向图干预敏感性崩溃。
 
 具体而言，Raw GIS 在 chain-3hop 到 chain-6hop 上呈现如下趋势：
 
@@ -426,7 +266,7 @@ Qwen Max 也呈现相同方向：Raw GIS 为 38.0%，PC-GIS 为 0%，GFI 为 38.
 |5|62.5|63.0|4.0|
 |6|67.2|46.7|3.0|
 
-对应的 decoy-last EAR 也显示出类似差异：
+对应的 EAR 也显示出类似差异：
 
 |Hop|DeepSeek-V4-Flash|GPT-5.4-mini|Qwen Max|
 |--:|--:|--:|--:|
@@ -742,7 +582,7 @@ jsoncot_strict
 
 > 显式路径输出和更强格式约束是否真的提高图忠实性？
 
-完整结果应报告 direct_minimal、jsoncot_basic 和 jsoncot_strict 在 chain 与 branching 设置下的 Accuracy、Raw GIS、PC-GIS、GFI、decoy-last EAR、TAC、PathValid、PathGoldExact 和 (\Delta_{\text{illegal}})。
+完整结果应报告 direct_minimal、jsoncot_basic 和 jsoncot_strict 在 chain 与 branching 设置下的 Accuracy、Raw GIS、PC-GIS、GFI、EAR、TAC、PathValid、PathGoldExact 和 (\Delta_{\text{illegal}})。
 
 特别需要保留 basic vs strict 的对比。若 jsoncot_basic 在某些设置下具有更高单点正确率，但 jsoncot_strict 具有更强格式稳定性或更低位置污染，应明确报告这一 trade-off。该对比说明 prompt interface 不是简单的“越严格越好”，而是在答案正确率、位置稳健性、格式服从和路径合法性之间产生不同权衡。
 
