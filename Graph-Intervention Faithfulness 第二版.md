@@ -322,21 +322,10 @@ Table X.Verifier-retry results on branching-12hop + `jsoncot_strict`. pass@K is 
 ---
 # 6 Analysis
 
-第 5 节已经报告了主要实验结果：弱提示下的 chain graphs 会暴露答案层位置虚胖，结构化输出能缓解简单链式图上的 shortcut，但在 branching graphs 上又暴露出路径层非法轨迹；thinking 能显著缓解失败但延迟较高，verifier-retry 能部分缓解非法路径但存在上限。
+第 5 节已经报告了主要实验结果：弱提示下 chain graphs 会暴露答案层位置捷径，使用结构化输出缓解可以，但又会在 branching graphs 上揭露路径层的非法轨迹，对此尝试了两种缓解方法，思考模式能力强但时延成本高，verifier-retry 可以提高 pass@K 但收益随 K 增加递减。本节继承黑箱诊断角度主要从三个方面进一步分析失败模式间的关系：第一，分析 TAC 与 $\Delta_{\text{illegal}}$ 的分布，刻画“自洽但非法”的轨迹缺口在哪些拓扑、路径长度和模型设置下最严重。
 
-本节不再重复结果表，而是进一步解释这些现象背后的机制。我们关注三个问题：
 
-1. 为什么自洽的结构化轨迹仍然可能是非法路径？
-    
-2. 为什么 verifier-retry 有效但会饱和？
-    
-3. FailureHop 和 repeated same-hop failure 如何揭示结构性瓶颈？
-    
-
-总体而言，分析表明，模型的关键失败并不是不会输出路径，也不是简单格式错误，而是无法稳定维护图上的当前状态，并在每一步选择真实存在的后继节点。
-
----
-
+；第二，在 verifier-retry 框架下，pass@K 的收益结构如何与底座模型的失败结构相对应？具体而言，pass@K 相对独立重试零基线的偏离，是否与 FailureHop 在 hop 维度上的集中度一致；第三，随着 retry 次数增加，剩余失败样本在 hop 维度上的集中程度如何变化？repeated same-hop failure 是否揭示了 retry 饱和背后的数据层结构？总体而言，§6.1 分析 TAC 与 PathValid 的脱节，§6.2 使用独立重试零基线诊断 pass@K 饱和，§6.3 进一步用 FailureHop 与 repeated same-hop failure 定位剩余失败的集中性。
 ## 6.1 为什么自洽轨迹仍然可能是非法路径
 
 在 branching-12hop + jsoncot_strict 设置下，多数模型可以生成格式正确、答案与路径末节点一致的结构化输出。换言之，它们通常能满足：
