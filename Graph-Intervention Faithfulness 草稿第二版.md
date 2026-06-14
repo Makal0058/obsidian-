@@ -159,7 +159,7 @@ Chain graphs 用于检测仅答案（answer-only）设置下的终点位置捷�
 | DeepSeek-V4-Pro   | thinking    | 观察思考模式是否缓解答案层与路径层失败                     |
 | Qwen Max          | no-thinking | 开源模型对照，相同任务设置下检验失败模式是否稳定存在              |
 | GPT-5.4-mini      | no-thinking | 闭源模型对照，相同任务设置下检验失败模式是否稳定存在              |
-需要说明的是，GPT-5.4-mini 结果来自第三方 OpenAI-compatible 中转服务，因此本文按由服务商路由的模型配置（provider-routed model configuration）报告该结果，而不将其等同于官方 API 配置。此外，不同模型接口对结构化输出的支持并不完全一致。GPT-5.4-mini 的部分调用使用了 API 级 JSON 输出约束（`response_format: {"type": "json_object"}`），而 DeepSeek 和 Qwen 的对应调用主要依赖 prompt 约束输出格式。因此，跨模型比较 format failure 或 parse failure 时需谨慎；GPT-5.4-mini 较低的格式失败率可能部分来自接口级 JSON 约束，而不完全反映模型自身的格式遵循能力。本文的主要跨模型比较聚焦于答案层和路径层图推理指标，对格式相关指标仅作辅助诊断。
+需要说明的是，GPT-5.4-mini 结果来自第三方 OpenAI-compatible 中转服务，因此本文按由服务商路由的模型配置（provider-routed model configuration）报告该结果，而不将其等同于官方 API 配置。此外，不同模型接口对结构化输出的支持并不完全一致。所有模型均通过 prompt 要求输出 JSON；不同服务商接口的格式遵循能力可能仍存在差异，因此格式失败率仅作为辅助诊断。本文的主要跨模型比较聚焦于答案层和路径层图推理指标，对格式相关指标仅作辅助诊断。
 ### 4.2.2 提示接口（Prompt interfaces）
 
 本文使用五类 prompt，其中前三类用于主任务，后两类用于 prior control。
