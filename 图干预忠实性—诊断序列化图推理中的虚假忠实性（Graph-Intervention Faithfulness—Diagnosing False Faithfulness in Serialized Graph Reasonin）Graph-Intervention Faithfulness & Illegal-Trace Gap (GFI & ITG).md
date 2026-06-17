@@ -5,67 +5,133 @@
 ----
 # 摘要（abstract）
 
-大语言模型（LLM）被越来越多地用于知识图谱问答（Knowledge Graph Question Answering，KGQA）、图上搜索（Graph Search，GS）和工具增强推理（Tool-Augmented Reasoning，TAR），但他们不直接处理图，而是接受图的文本序列化表示。于是，一个本应由图结构决定的任务就可能被终点位置、边顺序或格式等非结构线索驱动。本文提出 Graph-Intervention Faithfulness（GIF），用于诊断序列化图推理的两类假忠实性。第一类是答案层忠实性：模型的答案看似随反事实图干预而变化，但这种敏感性在控制终点位置后可能消失；第二类是路径层假忠实性：模型给出的推理路径虽然能够导向最终答案，但其中的节点跳转未必均对应输入图中的合法边。为此，针对提出的问题，本文设计了双层诊断框架，最终得到三条经验发现。通过结合反事实图对、位置控制序列化和符号路径验证，分别量化答案层与路径层的结构忠实性。基于合成链式图、分叉图，以及[⼀个小规模真实知识图子集（还未做）]，发现弱提示下容易诱发答案层位置捷径；结构化输出可以缓解简单链式图的位置依赖，但在更难的分叉图[或真实任务（还未做）]中揭露“自洽但非法”的路径；通过高预算内部推理可以几乎消除这两类失败，而 verifier-retry 虽然便宜，却受到底座模型图追踪能力的显著限制。结果表明，无论是答案正确、答案响应图干预而变化，还是推理轨迹导向最终答案，单一现象均不足以证明模型忠实地遵循了图结构。
+大语言模型（LLM）被越来越多地用于知识图谱问答（Knowledge Graph Question Answering，KGQA）、图上搜索（Graph Search，GS）和工具增强推理（Tool-Augmented Reasoning，TAR），相关工作通常以最终答案准确率或路径与答案的一致性作为成功标志。然而，它们不直接处理图，而是接受图的文本序列化表示在序列化图推理中，答案随图改变和路径与答案自洽都只是必要行为信号，均不足以单独证明模型忠实地遵循了输入图结构。于是，一个本应由图结构决定的任务就可能被终点位置、边顺序或格式等非结构线索驱动。本文提出 Graph-Intervention Faithfulness（GIF），用于诊断序列化图推理的两类假忠实性。第一类是答案层忠实性：模型的答案看似随反事实图干预而变化，但这种敏感性在控制终点位置后可能消失；第二类是路径层假忠实性：模型给出的推理路径虽然能够导向最终答案，但其中的节点跳转未必均对应输入图中的合法边。为此本文设计了一个双层诊断框架，结合反事实图对、位置控制序列化和符号路径验证，分别量化答案层与路径层的结构忠实性。在 DeepSeek、Qwen、GPT 三个模型族上开展实验，基于合成链式图、分叉图等设置，得到三条主要发现：第一，基于合成链式图、分叉图，发现弱提示下容易诱发答案层位置捷径；第二，结构化输出可以缓解简单链式图的位置依赖，但在更难的分叉图中揭露“自洽但非法”的路径；第三，高预算思考模式几乎可以消除这两类失败；verifier-retry 显著便宜，但通过与独立重试零基线的对比，我们发现其 pass@K 提升受底座模型图追踪能力和样本难度异质性的双重限制。结果表明，无论是答案正确、答案随图干预变化还是推理轨迹导向最终答案，单一现象均不足以证明模型忠实地遵循了图结构。[基于真实世界知识图谱子集的补充实验（附录 X）进一步支持了上述发现。]
 
-英文版：Large language models (LLMs) are increasingly used for Knowledge Graph Question Answering (KGQA), Graph Search (GS), and Tool-Augmented Reasoning (TAR). However, rather than operating on graphs directly, they typically consume textual serializations of graph structures. As a result, tasks whose answers should be determined by graph topology may instead be driven by non-structural cues, such as endpoint position, edge order, or formatting patterns.We introduce Graph-Intervention Faithfulness (GIF), a framework for diagnosing two forms of false faithfulness in serialized graph reasoning. The first is answer-level false faithfulness: a model’s answer may appear to respond to counterfactual graph interventions, yet this apparent sensitivity can disappear once endpoint position is controlled. The second is path-level false faithfulness: a generated reasoning path may lead to the final answer while containing node transitions that do not correspond to valid edges in the input graph.To address these issues, we develop a two-level diagnostic framework that combines counterfactual graph pairs, position-controlled serializations, and symbolic path verification to quantify structural faithfulness at both the answer and path levels. Experiments on synthetic chain graphs, branching graphs, and [a small-scale subset of a real-world knowledge graph, to be added] yield three main findings. First, weak prompting readily induces answer-level positional shortcuts. Second, structured output mitigates positional dependence on simple chain graphs, but exposes “self-consistent yet invalid” paths on more challenging branching graphs [or real-world tasks, to be added]. Third, high-budget internal reasoning nearly eliminates both failure modes, whereas verifier-retry is considerably cheaper but remains strongly constrained by the underlying model’s ability to follow graph structure.Overall, our results show that answer correctness, responsiveness to graph interventions, and consistency between a reasoning trace and its final answer are each insufficient, on their own, to establish that a model faithfully follows the underlying graph structure.
+英文版：Large language models (LLMs) are increasingly used for Knowledge Graph Question Answering (KGQA), Graph Search (GS), and Tool-Augmented Reasoning (TAR), where success is often assessed by final-answer accuracy or consistency between a generated path and its answer. However, LLMs do not operate on graphs directly; instead, they consume textual serializations of graph structures.In serialized graph reasoning, responsiveness to graph changes and path–answer consistency are both necessary behavioral signals, yet neither is sufficient on its own to establish that a model faithfully follows the input graph structure.Consequently, tasks whose solutions should be determined by graph topology may instead be driven by non-structural cues, such as endpoint position, edge order, or formatting.We introduce Graph-Intervention Faithfulness (GIF), a framework for diagnosing two forms of false faithfulness in serialized graph reasoning. The first is answer-level false faithfulness: a model’s answer may appear to respond to counterfactual graph interventions, yet this sensitivity can disappear once endpoint position is controlled. The second is path-level false faithfulness: a generated reasoning path may lead to the final answer even though some of its node transitions do not correspond to valid edges in the input graph.**English**
 
----
-关键词：忠实性；图推理；知识图谱问答；序列化偏差；位置偏差；结构化推理；验证；工具图
+To diagnose these two failure modes, GIF combines counterfactual graph pairs, position-controlled serializations, and symbolic path verification in a two-level framework that evaluates structural faithfulness at both the answer and path levels. We conduct experiments on synthetic chain and branching graphs across the DeepSeek, Qwen, and GPT model families, and obtain three main findings. First, weak prompting readily induces answer-level positional shortcuts on chain graphs. Second, structured output mitigates positional dependence on simple chain graphs but exposes “self-consistent yet invalid” paths on more challenging branching graphs. Third, high-budget reasoning modes nearly eliminate both failure modes. Verifier-retry is substantially cheaper; however, comparison against an independence-based retry null baseline shows that its pass@K gains are jointly constrained by the underlying model’s graph-tracking ability and heterogeneity in instance difficulty. For some models, verifier-retry can even yield negative gains relative to this baseline. [Supplementary experiments on a real-world KG subset (Appendix X) corroborate these patterns.]
 
-key word：faithfulness, graph reasoning, knowledge graph question answering, serialization bias, position bias, structured reasoning, verification, tool graphs
+关键词：忠实性；图推理；知识图谱问答；序列化偏差；位置偏差；结构化推理；验证；
+
+Key Word：faithfulness, graph reasoning, knowledge graph question answering, serialization bias, position bias, structured reasoning, verification
 
 ---
 # 1 引言
 
-大语言模型（Large Language Models，LLMs）正被广泛用于知识图谱问答、图上搜索 [19] 和工具增强推理 [23] 等任务。由于 LLM 无法直接处理抽象图，图结构通常需要被转换为边列表、邻接表或 JSON 等文本序列。然而，文本序列除了表达图的节点和边，还引入了顺序、位置和格式等图本身不具有的属性。因此，一个本应由图拓扑决定的任务，也可能被序列化过程中产生的非结构线索驱动。现有图推理研究通常将答案正确、答案随图变化，或推理轨迹导向最终答案视为模型使用图结构的证据。本文指出，单一现象均不足以证明模型忠实地遵循了图结构，即不足以建立 graph faithfulness。首先，答案正确并不意味模型真正忠实于图。模型可能依赖节点名称、候选偏好、参数记忆或答案在文本中的文职得到正确结果；其次，答案随图干预而变化也不是充分证据。该百年图结构时，文本中的节点内容、边顺序或终点位置往往同时变化。因此模型可能只是响应序列化文本的变化而非图的拓扑变换。换言之，答案随图变化是图忠实性的必要条件之一，但不是充分条件；最后，模型可能生成一条推理轨迹导向最终答案，但其中某些路径不是输入图中的合法边的路径。此时，轨迹与答案虽然相互自洽，模型却不忠实于输入图结构。
+大语言模型（Large Language Models，LLMs）正被广泛用于知识图谱问答、图上搜索 [19] 和工具增强推理 [23] 等任务。由于 LLM 无法直接处理抽象图，图结构通常需要被转换为边列表、邻接表或 JSON 等文本序列。然而，文本序列除了表达图的节点和边，还引入了顺序、位置和格式等图本身不具有的属性。因此，一个本应由图拓扑决定的任务，也可能被序列化过程中产生的非结构线索驱动。现有图推理研究通常将答案正确、答案随图变化 [30]，或推理轨迹导向最终答案 [22] 视为模型使用图结构的证据。本文指出，单一现象均不足以证明模型忠实地遵循了图结构，即不足以建立 graph faithfulness。首先，答案正确并不意味模型真正忠实于图。模型可能依赖节点名称、候选偏好、参数记忆或答案在文本中的位置得到正确结果；其次，答案随图干预而变化也不是充分证据。改变图结构时，文本中的节点内容、边顺序或终点位置往往同时变化。因此模型可能只是响应序列化文本的变化而非图的拓扑变换。换言之，答案随图变化是图忠实性的必要条件之一，但不是充分条件；最后，模型可能生成一条推理轨迹导向最终答案，但轨迹中包含输入图中不存在的边。此时，轨迹与答案虽然相互自洽，模型却不忠实于输入图结构。在序列化图推理中，答案随图改变和路径与答案自洽都只是必要行为信号，均不足以单独证明模型忠实地遵循了输入图结构。
 
-为诊断这类问题，本文提出 Graph-Intervention Faithfulness（GIF）。GIF 在答案层结合反事实图对与位置控制序列化，检验模型的答案变化究竟来自图结构，还是来自终点位置等非结构线索；在路径层使用经符号验证的路径区分“轨迹-答案一致”与“路径在图上合法”。使用随机符号节点减少常识联想、参数记忆或节点语义的影响，并通过无图控制排除答案先验和候选偏好。实验覆盖链式图与分叉图，并比较不同了 prompt 对忠实性的影响以及两种缓解机制的效果。实验揭示了弱提示链式图上更容易出现位置捷径；同时在更困难的分叉图上，结构化输出能够生成形式完整、末节点与答案一致的轨迹，却仍包含大量输入图中不存在的跳转。这表明，结构化输出提高了轨迹的可读性和可验证性，但不会自动保证图忠实性。进一步的，高预算推理可以显著减少位置捷径和非法路径，代价是较高的时间成本；外部符号验证能够以更低时延缓解部分非法路径，但强烈依赖底座模型自身的状态追踪能力。
+为诊断这类问题，本文提出 Graph-Intervention Faithfulness（GIF）。GIF 在答案层结合反事实图对与位置控制序列化，检验模型的答案变化究竟来自图结构，还是来自终点位置等非结构线索；在路径层使用经符号验证的路径区分“轨迹-答案一致”与“路径在图上合法”。使用随机符号节点减少常识联想、参数记忆或节点语义的影响，并通过无图控制排除答案先验和候选偏好。实验覆盖链式图与分叉图，并比较不同提示方式对忠实性的影响以及两种缓解机制的效果。实验揭示了弱提示链式图上更容易出现位置捷径；同时在更困难的分叉图上，结构化输出能够生成形式完整、末节点与答案一致的轨迹，却仍包含大量输入图中不存在的跳转。这表明，结构化输出提高了轨迹的可读性和可验证性，但不会自动保证图忠实性。进一步的，高预算推理可以显著减少位置捷径和非法路径，代价是较高的时间成本；外部符号验证能够以更低时延缓解部分非法路径，但强烈依赖底座模型自身的状态追踪能力。在 branching-12hop 上，Qwen Max 的结构化输出能产生 TAC 99.2% 但 $\Delta_{\text{illegal}}$ 90.8% 的轨迹——形式完整、末节点对、却有九成路径包含非法边
 
-最后总结本文的主要贡献：第一，问题层面指出图任务的高准确率、轨迹-答案一致性等都不足以证明 LLM 忠实使用图，模型既可能在答案层依赖终点位置捷径，也可能在路径层生成自洽但图上非法的轨迹；第二，方法层面提出一种面向序列化图推理的图干预忠实性诊断框架 GIF，结合反事实图对、位置控制序列化等，诊断答案层的位置锚定与路径层的非法轨迹，并定义 GFI、$\Delta_{\text{illegal}}$ 等指标；第三，发现层面揭示 LLM 图推理中的两类假忠实性及其随任务难度切换主要影响。弱提示链式图主要暴露答案层位置虚胖；困难分叉图暴露路径层非法轨迹。两种缓解机制显示 thinking 几乎完美消除失败，代价是时间，verifier-retry 能以较低延迟部分缓解非法路径，代价是受限于底座模型能力。
+最后总结本文的主要贡献：第一，在问题层面，形式化区分图忠实性的三种常见替代证据（答案正确、答案随图变化、轨迹-答案一致）与真正的图忠实性，明确指出每一种都是必要而非充分条件；第二，在方法层面，提出一种面向序列化图推理的图干预忠实性诊断框架 GIF，结合反事实图对、位置控制序列化等，诊断答案层的位置锚定与路径层的非法轨迹，并定义答案层位置虚胖度量 GFI 与路径层非法轨迹度量 $\Delta_{\text{illegal}}$ 等指标；第三，在发现层面，揭示 LLM 图推理中的两类假忠实性及其随任务难度切换主要影响。弱提示链式图主要暴露答案层位置虚胖；困难分叉图暴露路径层非法轨迹。两种缓解机制显示 thinking 几乎完美消除失败，代价是较高的时间成本，verifier-retry 能以较低延迟部分缓解非法路径，代价是受限于底座模型能力。
 
-
-
-
-
+英文版：
 # 1 Introduction
 
-利用大语言模型（LLM）协助知识图谱和结构化数据的推理，已经成为一条重要的路线。关系路径规划[22]、图上搜索[19]、工具调用或受约束解码[23]等方法中，已有使LLM在多跳问答等图任务中利用显式图结构并得到的可观的性能提升。然而，LLM不能直接处理抽象图本身，必须将图这种结构化对象，转换成LLM可以处理的文本形式（例如边列表、邻接表或 JSON 序列化等）。token序列具有图本身不具有的额外属性，例如顺序、格式、位置等，图 $\to$ 文本的转化会引入额外信息。于是，一个设想上完全由图结构决定的推理任务，可能会在输入时附加一层token层面的诱导。前人研究已表明LLM对输入高度敏感：同一张图，仅改变描述格式、节点名称或边的排列顺序就可能改变LLM预测[1]；长上下文中模型更容易忽略中间信息[37]；多选题仅调换选项顺序即可显著改变预测[16]。早期 CoT faithfulness 研究已指出，应区分推理过程看起来合理与模型决策的真正依据（plausibility 与 faithfulness）[7]；随后，行为干预式 CoT faithfulness 研究进一步表明，判断忠实性需要通过输入扰动或偏置信号干预来观察模型行为是否随之改变 [4,5]。
+Large language models (LLMs) are increasingly used for tasks such as knowledge graph question answering, graph search [19], and tool-augmented reasoning [23]. Because LLMs cannot directly operate on abstract graphs, graph structures are typically converted into textual sequences, such as edge lists, adjacency lists, or JSON serializations. However, beyond representing nodes and edges, textual sequences introduce properties that are absent from the underlying graph itself, including order, position, and formatting. Consequently, a task whose solution should be determined by graph topology may instead be driven by non-structural cues introduced during serialization.Existing graph-reasoning studies often treat answer correctness, responsiveness to graph changes [30], or a reasoning trace reaching the final answer [22] as evidence that a model has used the graph structure. We argue that none of these signals, in isolation, is sufficient to establish graph faithfulness. First, a correct answer does not necessarily imply that the model has faithfully used the graph. The model may instead rely on node names, candidate preferences, parametric memory, or the position of the answer in the serialized input. Second, an answer changing under a graph intervention is also insufficient evidence. When the graph structure is modified, the node content, edge order, or endpoint position in its textual representation often changes simultaneously. The model may therefore be responding to changes in the serialization rather than to changes in graph topology. In other words, responsiveness to graph interventions is a necessary behavioral signal of graph faithfulness, but not a sufficient one. Finally, a model may generate a reasoning trace that reaches the final answer while traversing edges that do not exist in the input graph. In such cases, the trace and answer are internally consistent, yet the model does not faithfully follow the graph structure.In serialized graph reasoning, responsiveness to graph changes and path–answer consistency are both necessary behavioral signals, yet neither is sufficient on its own to establish that a model faithfully follows the input graph structure.
 
-本文继承前人的忠实性研究，从图结构 $\to$ token序列中揭露一个潜在的问题：模型在图任务中答对或答案随图干预改变时，是真的遵循图结构，又或是利用额外引入的”例如正确答案往往出现在终点位置“这种位置信息。换言之，答案随图改变只是图忠实性的必要非充分条件：真正遵循图结构的模型对干预敏感，但干预下的答案变化也可能来自终点位置的文本内容变化。同时，本文类比 CoT faithfulness 研究的思路与方法论，将该观察迁移到图推理中的结构化轨迹：一条路径看起来连贯，并且其末节点与最终答案一致，并不意味着该路径忠实于输入图，即模型可能生成内部自洽的 path 与 answer，但中间的某些路径并不是图中的合法边。因此，图推理中轨迹-答案一致只能说明形式自洽，不能替代路径合法性验证。本文继承 CoT faithfulness 研究干预式视角，但将忠实性的对象从语言解释转向外部图结构：不再关注模型 CoT，而通过反事实图、位置控制和路径合法性等手段检验模型答案与轨迹是否受到输入图结构的约束。总而言之，本文关注两层问题，第一层发生在答案：模型答案看似随图结构改变，但这种敏感性可能来自锚定序列化文本的终点位置。第二层发生在路径：模型输出的答案与路径末节点一致，甚至是最终答案正确，但中间的路径不一定是图中合法边。
+To diagnose these problems, we introduce Graph-Intervention Faithfulness (GIF). At the answer level, GIF combines counterfactual graph pairs with position-controlled serializations to determine whether changes in model predictions are driven by graph structure or by non-structural cues such as endpoint position. At the path level, GIF applies symbolic path verification to distinguish between trace–answer consistency and graph-valid paths. We use random symbolic node identifiers to reduce the influence of commonsense associations, parametric memory, and node semantics, and introduce graph-free controls to rule out answer priors and candidate preferences. Our experiments cover both chain and branching graphs and compare the effects of different prompting strategies and two mitigation mechanisms.Our experiments show that positional shortcuts arise readily on chain graphs under weak prompting. On more challenging branching graphs, structured output can produce complete-looking traces whose final nodes agree with the answers, while still containing many transitions that do not exist in the input graph. This finding shows that structured output improves the readability and verifiability of reasoning traces but does not automatically guarantee graph faithfulness. Furthermore, high-budget reasoning substantially reduces both positional shortcuts and invalid paths, but incurs considerable latency. An external symbolic verifier combined with retry mitigates some invalid paths at lower latency, but its effectiveness depends strongly on the state-tracking ability of the underlying model. On branching-12hop, for example, Qwen Max achieves a Trace–Answer Consistency (TAC) of 99.2% under structured output, yet exhibits an illegal-path gap of ($\Delta_{\mathrm{illegal}}$=90.8%): the traces appear complete and terminate at the reported answers, while approximately nine out of ten fail graph-validity verification.
 
-本文提出 Graph-Intervention Faithfulness，简称 GIF，共包含两层受控诊断。路径层，首先构造正确终点不同且经符号验证的反事实图对，用于检测模型答案是否随图结构改变；其次为同一张图构造多种序列化版本，分别将正确终点放在开头 endpoint-first 、中间 endpoint-middle 、结尾 endpoint-last ，并在文本末尾放置错误的诱饵节点 decoy-last ，用于检验模型的“随图变换”是真正来自图跟随，还是终点这个位置信息。并定义原始图干预敏感性 Raw Graph Intervention Sensitivity（Raw GIS）、位置控制图干预敏感性 Position-Controlled GIS（PC-GIS）、图跟随能力虚胖 Graph-Following Inflation（GFI）和终点锚定率 Endpoint Anchoring Rate（EAR）。其中，$GFI = Raw GIS − PC-GIS$ ，用于检验位置虚胖是否存在，EAR用于衡量模型是否倾向于选择最后出现的节点。路径层，定义路径合法性 PathValid、黄金路径完全匹配 PathGoldExact、轨迹-答案一致性 Trace-Answer Consistency（TAC）和首次失败跳数 FailureHop 区分“轨迹自洽”与“图上合法”。
-
-实验中为去除常识联想、参数记忆等统计关联，专注考察追踪推理能力，使用无语义先验的随机符号节点。进一步，通过无图先验控制 prior-only（不给图结构，看模型是否凭任务描述、节点名或候选项猜对答案）与无图候选控制 candidate-only controls（只给候选答案，看模型是否偏好某个候选位置或 token）排除答案先验和候选偏好造成的混淆，两种先验控制下准确率均接近零、低于随机基线。实验覆盖两类图族：链式图（chain graph）用于揭示仅输出答案下的终点位置捷径、分叉图（branching graph）用于检验模型能否在多跳分支中追踪当前状态，和三个模型：DeepSeek、Qwen 与 GPT-5.4-mini 并比较思考模式与 verifier-retry 等。
-
-实验揭示两类容易被误认为图忠实的表面行为，其主导形态随难度和 prompt 发生此消彼长。
-
-![[Pasted image 20260609230531.png]]
-
-链式图弱提示下，模型表现出统计显著的答案层图跟随虚胖（DeepSeek-V4-Flash 的 Raw GIS 达 68.5%，但 PC-GIS 降为 0%，说明答案随图改变可能主要来自终点位置锚定，而非真实结构跟随），进一步，chain 长度扫描显示，DeepSeek-V4-Flash 稳定依赖终点位置捷径（endpoint-position shortcut），GPT-5.4-mini 表现为中间型捷径依赖，而 Qwen Max 在较长链上逐渐失去图干预敏感性（原因主要是模型已难以稳定响应图干预）。结果表明不同模型存在不同程度与性质的图跟随虚胖。同时，Qwen 实验表明 GFI 需与 Raw GIS 一起解释，只在 Raw GIS 较高而 PC-GIS 较低时，GFI 才刻画图跟随虚胖；若 Raw GIS 本身接近 0，则更应理解为图干预敏感性崩塌。
-
-当转入分叉图 branching graph 后，失败的主要因素从答案层的位置捷径转向路径层的非法路径。在12hop + jsoncot_strict 的组合中，DeepSeek-V4-Flash 的 轨迹-答案一致性 TAC 为 99.3%，但非法路径差距 $\Delta_{\text{illegal}}$ 达到了 50.8%；Qwen Max 则更加极端，TAC 为 99.2%，$\Delta_{\text{illegal}}$ 高达 90.8%。jsoncot_strict 能让模型生成看似完整、答案一致的轨迹，却不能保证轨迹中的每一步都忠实于图。基于此，本文尝试了两种缓解机制：内部预算推理（思考模式） vs 外部符号反馈（verifier-retry）。![[Pasted image 20260609232618.png]]
-DeepSeek-V4-Pro thinking 在 branching-12hop 上几乎完美解决任务，PathGoldExact 达 99.9%，但平均耗时 46.7 秒；相比之下 DeepSeek-V4-Flash_verifier-retry 的PathGoldExact 从 pass@1 的 48.6% 提升到 pass@5 的 70.6%，累计平均耗时 4.42 秒，说明verifier-retry 能以较低时延提高 pass@K，即提高多次尝试中获得通过 verifier 路径的概率；但它并不直接提升单次生成能力，收益受模型初始通过率限制；值得注意的是，Qwen Max 仅从 8.4% 提升到 33.4%，说明外部符号反馈只是放大而非凭空创造能力，其收益受底座模型状态追踪能力限制。
-
-
+Our contributions are threefold. First, at the problem level, we formally distinguish three commonly used surrogate signals—answer correctness, responsiveness to graph interventions, and trace–answer consistency—from graph faithfulness itself, and show that none is sufficient on its own. A model may rely on endpoint-position shortcuts at the answer level or generate self-consistent yet graph-invalid traces at the path level. Second, at the methodological level, we propose GIF, a diagnostic framework for graph-intervention faithfulness in serialized graph reasoning. GIF combines counterfactual graph pairs, position-controlled serializations, and symbolic path verification to diagnose answer-level positional anchoring and path-level invalidity. We further introduce answer-level Graph-Following Inflation GFI and the path-level illegal-trace measure $\Delta_{\mathrm{illegal}}$, among other diagnostic metrics. Third, at the empirical level, we identify two forms of false faithfulness whose dominant manifestation shifts with task difficulty. Weakly prompted chain graphs primarily expose answer-level graph-following inflation caused by positional shortcuts, whereas challenging branching graphs primarily expose path-level invalid traces. High-budget thinking nearly eliminates both failure modes, but at a substantial latency cost. Verifier-retry partially mitigates invalid paths at lower latency, but its gains remain bounded by the graph-tracking capability of the underlying model.
 
 ---
+# 2. 相关工作
+## 2.1 思维链忠实性
+
+Chain-of-Thought（CoT）提示能够提升大语言模型在数学、逻辑与多步推理任务中的表现，但模型生成的推理过程未必真实反映其预测依据。早期忠实性研究区分了合理性（plausibility）与忠实性（faithfulness）：一段解释可以看起来完整可信但不忠实 [7]；行为干预式研究进一步通过改变输入中的偏置信号或模型生成的 CoT 观察最终预测是否响应变化；Turpin 等人指出解释可能“貌似合理但不真正反映预测成因” [5]；Lanham 等人通过修改、截断或移除 CoT 检验最终答案是否依赖所生成的推理过程 [9]。近期工作进一步考察模型是否会在语言化推理中报告影响其答案的提示信号 [4]，或借助内部激活与计算图开展白盒验证 [6]，与本文采用的黑箱诊断视角形成互补。这些研究共同表明，解释的连贯性、答案的正确性和推理的忠实性是不同的属性。
+
+## 2.2 图序列化及其位置敏感性
+
+图本身通常不具有固定的线性顺序，但 LLM 接受的是 token 序列。将图转换为边列表、邻接表、JSON 或自然语言描述时，节点与边会获得图结构本身不包含的位置、排列和格式等信息。已有研究发现，LLM 图推理器缺乏序列化不变性：在图结构保持不变的情况下，仅改变节点标号、边的排列顺序或描述格式，就可能显著改变模型预测 [1]；长上下文中的中间信息更容易被忽略 [37]，多项选择题的选项顺序会影响答案 [16]，列表排序与推荐任务中的项目位置也会改变模型判断 [13,14]。反事实测评为识别此类捷径提供了重要手段。CofCA 通过构造反事实多跳问答样本，降低参数记忆和事实共现对结果的影响，从而检验模型能否依据给定上下文完成推理 [30]。与其不同，本文关注图序列化额外引入的位置与顺序线索，即使模型的答案能够随反事实图变化，这种变化也可能来自改变图结构时同步变化的节点内容、边顺序或终点位置等信息，模型可能只是响应序列化文本的变化而非图的拓扑变换。因此，仅观察图干预前后的答案变化仍不足以建立图忠实性。
+
+## 2.3 图推理与工具增强推理
+
+已有大量工作通过显式图结构增强 LLM 推理。一类方法生成或检索知识图谱关系路径 [22]，沿给定路径完成多跳推理 [24]，构造显式图推理过程 [25]，或利用路径约束引导答案生成 [26]；另一类是将推理建模为图上搜索 [19]、受约束解码或工具调用 [23]，使模型在推理过程中逐步获取邻居、关系或其他结构化信息。还有工作利用知识图谱路径作为训练或奖励信号，以增强组合推理与路径对齐能力 [28]。然而，图结构被提供、检索或生成，并不意味着模型一定忠实地沿图推理，模型仍可能依赖节点位置等线索，或生成一条导向答案但包含非法边的轨迹。已有工作开始超越纯答案正确率，只有在答案正确且预测路径可达时，才将一次预测视为正确 [29]，此类测评是本文工作最接近的对照之一。此类测评加强了答案与路径间的联系，但没有进一步隔离序列化位置线索，也未充分区分”路径能够导向答案“与”模型生成的每一步均为输入图中的合法边“。
+
+因此，CoT 忠实性研究已经说明看起来合理的推理不等于真正驱动预测的推理，必须通过干预来检验模型是否真的受某类证据约束，本文继承其干预式方法论，但将研究对象从语言化解释转向外部图结构；图序列化研究则表明，图一旦被转为 token 序列，节点标号、边顺序和格式变化都可能显著改变模型输出；图推理与工具增强推理研究则表明，显式图结构或工具接口能够提升推理性能。将这三条研究线索结合起来，便形成了 GIF 所关注的核心缺口：在序列化图推理中，答案随图改变和路径与答案自洽都只是必要行为信号，均不足以单独证明模型忠实地遵循了输入图结构。
+
+英文版：
 # 2 Related Work
 
-## 2.1 语言化推理忠实性与结构化路径输出
+## 2.1 Chain-of-Thought Faithfulness
 
-CoT 提示提升了 LLM 在数学、逻辑和多步推理任务上的表现，但也引出了一个核心问题：模型生成的推理过程是否真实反映了驱动其预测的因素。已有的忠实性研究区分了合理性（plausibility）与忠实性（faithfulness）[7]，这点对图推理同样重要：一个推理路径可以看起来完整连贯，但不忠实于图。行为干预式研究进一步表明，忠实性不能只通过阅读判断模型生成的解释，还需要观察模型在输入扰动、偏置信号或反事实条件下的行为是否相应改变。Turpin 等人表明，模型可能受输入中偏置信号影响，生成看似合理的解释[5]；Lanham 等人通过改变或移除 CoT，观察最终答案是否随之变化来衡量 CoT 是否真的参与模型决策[9]。前人的这些工作已经说明，模型生成的推理过程不一定真实反映驱动预测的因素，最终答案正确、解释看起来合理、解释忠实推理是不同的属性。近期工作还区分了语言化忠实性与更广义的因果或结构忠实性。Young 等人检验推理模型 CoT 是否显式承认影响答案提示或偏置信号，但这仍主要是检验模型是否报告相关因素[4]。白盒计算图验证方法提供另一条互补路径，但通常依赖特定模型并需要访问内部激活[6]。现有忠实性工作大多关注语言化推理是否忠实地报告模型答案的成因。与之不同，本文借鉴这一方法论，但将对象从语言化解释转向图推理中的结构化路径输出。图推理中，真正相关的问题不只是模型能否给出合理解释,而是输出路径是否真的由图的合法边组成。轨迹与答案一致只能说明输出内部自洽,不能替代路径合法性验证。GIF 利用 TAC 、PathValid、PathGoldExact 和 FailureHop 等诊断“自洽但图上非法”的路径层失败。
+Chain-of-Thought (CoT) prompting can improve the performance of large language models on mathematical, logical, and multi-step reasoning tasks, yet the generated reasoning process may not faithfully reflect the basis of the model’s prediction. Early work on faithfulness distinguished plausibility from faithfulness: an explanation may appear complete and convincing while still being unfaithful [7]. Intervention-based studies further examine whether final predictions respond when biased cues in the input or the generated CoT are modified. Turpin et al. showed that explanations may appear plausible without faithfully reflecting the factors that caused the prediction [5]. Lanham et al. tested whether final answers depend on the generated reasoning process by modifying, truncating, or removing the CoT [9]. More recent work has examined whether models verbalize prompt signals that influence their answers [4], or has used internal activations and computational graphs for white-box verification [6], complementing the black-box diagnostic perspective adopted in this work. Together, these studies show that explanatory coherence, answer correctness, and reasoning faithfulness are distinct properties.
 
-## 2.2 序列化位置敏感性与反事实诊断
+## 2.2 Graph Serialization and Positional Sensitivity
 
-图是无序结构，LLM 处理的是token序列，当图结构被转换为边列表、邻接表、JSON、自然语言描述或工具返回的局部观察时，节点和边将不可避免的获得某种顺序和位置。已有研究表明，LLM 图推理器缺乏序列化不变性，一张图的等价文本表示在仅更改节点标号、边排列顺序或描述格式的情况下，就可能改变模型输出[1]。类似的位置敏感性也出现在其他任务中，例如，多选题中调换选项顺序即可显著影响模型预测[16]；列表排序[13]和推荐任务[14]中，项目位置也会影响模型判断。这些结果共同说明，本应与任务语义无关的顺序和位置，可能被 LLM 当作决策线索。反事实基准被用于排除特定捷径，CofCA 构造反事实多跳问答样本降低模型对记忆性事实的统计关联，检验模型能否真正沿给定上下文完成多步推理[30]。这与本文动机高度相关：CofCA 针对的是记忆关联造成的推理虚胖；GIF 关注的是序列化图后额外引入的位置和顺序线索造成的图跟随虚胖。二者都在追问同一个问题：当某条捷径被系统性控制后，表面上的推理表现是否仍然成立？这一观察直接对应本文的答案层诊断问题。在序列化图推理中，正确终点可能稳定出现在文本中的显著位置，使模型即使没有真正沿图结构推理，也表现出答案随图干预改变的表面敏感性。GIF 通过 endpoint-first \ middle \ last 和 decoy-last 等位置控制，进一步区分真实结构敏感性与终点位置锚定，并用 GFI 和 EAR 量化答案层的图跟随虚胖。
+Graphs generally have no fixed linear order, whereas LLMs receive token sequences. When a graph is converted into an edge list, adjacency list, JSON representation, or natural-language description, its nodes and edges acquire positional, ordering, and formatting properties that are absent from the underlying graph itself. Prior work has shown that LLM graph reasoners often lack serialization invariance: even when the graph structure remains unchanged, altering node identifiers, the ordering of edges, or the description format can substantially affect model predictions [1]. Similar effects arise in other settings: information in the middle of long contexts is more likely to be overlooked [37], option order can affect answers in multiple-choice tasks [16], and item position can influence model judgments in ranking and recommendation tasks [13,14].
 
-## 2.3 图推理、路径跟随与验证
+Counterfactual evaluation provides an important means of identifying such shortcuts. CofCA constructs counterfactual multi-hop question-answering examples to reduce the influence of parametric memory and factual co-occurrence, thereby testing whether models can reason from the provided context [30]. In contrast, we focus on positional and ordering cues introduced by graph serialization. Even when a model changes its answer across counterfactual graphs, this response may be driven by accompanying changes in node identifiers, the ordering of edges, or the position of the correct endpoint. The observed sensitivity may therefore reflect properties of the serialization rather than the underlying graph topology. Consequently, observing answer changes under graph interventions is not, by itself, sufficient to establish graph faithfulness.
 
-一类方法围绕知识图谱路径和显式图式推理展开：它们生成或检索关系路径[22]，沿给定路径完成推理[24]，构造显式图式推理过程[25]，或对生成过程施加路径约束[26]，使模型借助显式图结构完成多跳问答。另一类将图推理建模为图上搜索[19]、工具调用[23]等，让模型通过搜索函数或图工具逐步获取邻居信息并完成推理。这些方法表明显式图结构能提高图任务和多跳问答表现。然而，性能提升或路径生成本身并不自动证明模型忠实使用了图结构。首先，若输入图或检索路径以线性文本形式呈现，模型可能受到终点、顺序或格式线索的影响。其次，即使模型生成显式路径，该路径也可能只是在输出层面与答案自洽，不一定对应输入图上的合法边。因此，图结构“被提供”、“被检索”或“被生成”与图结构“被忠实遵循”之间仍存在诊断缺口。这一点对路径奖励和路径对齐方法尤其重要，此类方法通常要求模型外显一条候选路径，才能计算该路径与知识图谱或目标 CoT 的对齐程度[28]。但路径外显本身并非中性，改变输出接口可能显著改变模型的失败模式。本文结果显示，要求模型输出结构化路径，一方面可以显著压低 answer-only 设置下的终点位置捷径，另一方面并不保证生成路径真的由输入图中的合法边组成，路径层仍可能存在非法轨迹问题。因此，依赖路径外显的训练或评测方法，也需要显式检验路径合法性与位置控制下的结构忠实性。已有一些工作开始超越纯答案准确率，关注路径或推理过程的结构有效性。例如，FidelityAcc 仅当答案正确且预测路径可达时，才将一次预测记为正确[29]，这是本文最接近的评测动机之一。但 FidelityAcc 主要关注答案是否由可达路径支撑，并未进一步隔离序列化位置线索，同时也没有诊断答案层的图跟随虚胖。GIF 与这些工作互补：一方面，通过反事实图对与位置控制，检验答案是否真的受图结构而非终点位置控制；另一方面，通过 PathValid、PathGoldExact、TAC 和 FailureHop，检验结构化轨迹是否真的是输入图上的合法路径。也就是说，GIF 不仅问“答案是否由某条路径支撑”，还问“答案是否在位置控制后仍随图结构改变”，以及“模型生成的这条路径是否真的忠实于图边”。
+## 2.3 Graph Reasoning and Tool-Augmented Reasoning
 
-总体而言，已有工作分别回答了三个相邻但不同的问题：图推理工作主要关心如何利用图结构提高最终答案表现、图序列化工作主要关心不同的输入线性化方式如何影响模型输出、路径验证工作主要关心生成路径是否可被检查，以及是否能够支撑答案。GIF 关注的是一个更细的图忠实性问题：图被序列化为文本后，模型答案和结构化路径是否仍受输入图结构本身约束，而非由终点位置、边列表顺序或输出内部自洽性制造出表面忠实性。为此，GIF 将反事实图干预、位置控制序列化和路径级合法性验证结合起来，同时诊断答案层的图跟随虚胖与路径层的自洽但非法轨迹。
+A large body of work enhances LLM reasoning through explicit graph structures. One line of research generates or retrieves relational paths from knowledge graphs [22], performs multi-hop reasoning along provided paths [24], constructs explicit graph-based reasoning processes [25], or guides answer generation through path constraints [26]. Another line formulates reasoning as graph search [19], constrained decoding, or tool use [23], allowing models to acquire neighboring nodes, relations, or other structured information step by step. Other work uses knowledge-graph paths as training or reward signals to improve compositional reasoning and path alignment [28].
+
+However, providing, retrieving, or generating graph structure does not necessarily imply that a model faithfully reasons over it. A model may still rely on cues such as node position, or generate a trace that reaches the answer while traversing invalid edges. Some prior work moves beyond pure answer accuracy by counting a prediction as correct only when both the answer is correct and the predicted path is reachable [29], making it one of the closest points of comparison to our work. Such evaluation strengthens the connection between answers and paths, but does not further isolate positional cues introduced by serialization, nor does it fully distinguish between “a path reaches the answer” and “every generated transition corresponds to a valid edge in the input graph.”
+
+Overall, research on CoT faithfulness has shown that apparently plausible reasoning need not correspond to the reasoning that actually drives a prediction, motivating intervention-based tests of whether models are genuinely constrained by particular evidence. We inherit this intervention-based methodology while shifting the object of analysis from verbalized explanations to external graph structure. Research on graph serialization has shown that once a graph is converted into a token sequence, changes in node identifiers, edge order, and formatting can substantially affect model outputs. Research on graph reasoning and tool augmentation has demonstrated that explicit graph structures and tool interfaces can improve reasoning performance. Bringing these three lines of work together highlights the core gap that motivates GIF: in serialized graph reasoning, responsiveness to graph changes and path–answer consistency are both necessary behavioral signals, yet neither is sufficient on its own to establish that a model faithfully follows the input graph structure.
 
 ---
+# 3 Graph-Intervention Faithfulness
+
+$$
+\begin{aligned}
+&\underbrace{(T,G,s,k)}_{\text{输入任务与图}}
+\;\longrightarrow\;
+\underbrace{(G_1,G_2)}_{
+\substack{
+\text{构造反事实图对}\\
+y_1\neq y_2
+}}
+\\[6pt]
+&\xrightarrow{\;\sigma\in\Sigma_{\mathrm{pos}}\;}
+\underbrace{x_{\sigma}}_{
+\substack{
+\text{位置控制序列化}\\
+\text{first / middle / last/}\\
+\text{decoy-last}
+}}
+\;\xrightarrow{\text{LLM输出答案或路径}}\;
+(\hat y,\hat{\pi})
+\\[8pt]
+&\longrightarrow
+\left\{
+\begin{aligned}
+&\text{GFI 答案层假忠实性}
+\\[8pt]
+&\text{符号路径验证Verify}(\hat{\pi},G,s,k)
+\longrightarrow
+\left\{
+\begin{aligned}
+&\Delta_{\mathrm{illegal}}\text{-Trace Gap}
+\\[-1pt]
+&\qquad\text{路径层假忠实性}
+\\[6pt]
+&(\mathrm{FailureHop},\mathrm{ErrorType})
+\\[-1pt]
+&\qquad\longrightarrow
+\operatorname{Verifier-Retry} \text{成本收益分析}
+\end{aligned}
+\right.
+\end{aligned}
+\right.
+\end{aligned}
+$$
+本文研究序列化图推理中的结构忠实性诊断。给定输入图及其文本序列化，模型既可能因为真正遵循图结构而改变答案，也可能因为正确终点恰好处于显著文本位置而改变答案；同样，模型既可能给出一条真实存在于输入图中的合法路径，也可能给出一条导向最终答案但包含非法边的非法路径。因此，本文主要关注两个必要但非充分的行为信号：第一，答案随图干预改变并不蕴含答案忠实于图；第二，轨迹导向正确答案并不蕴含路径忠实于图。文本的目标是提供一个黑箱诊断程序，把这两类不忠实与真正的忠实性区分开。
+## 3.1 任务设定
+
+给定有向图 $G = (V,E)$（其中 $V$ 为节点集合，$E\subseteq V\times V$ 为有向边集合）、起点 $s\in V$ 以及跳数 $k$，模型需从 $s$ 出发，沿图中合法有向边移动 $k$ 跳后到达正确节点 $y$；在结构化输出设置下，模型需输出预测路径 $\hat p=(\hat v_0,\hat v_1,\ldots,\hat v_m)$ ，其中 $\hat v_0=s$，$\hat v_m=\hat y$。由于 LLM 接受的是线性化文本，因此定义序列化函数 $\sigma_\alpha(G)$，其中 $\alpha$ 表示一种具体的序列化配置，包括节点标号、边顺序、语法格式以及位置控制策略。答案层实验使用随机符号节点消除语义先验，通过无图先验控制（prior-only）和候选项限定的先验控制（candidate-only prior controls）检查无图条件下的固定答案偏好：若模型在无图条件下稳定输出某一候选答案，则该样本被视为受先验混淆的（prior-confounded）；检验模型输出是否真正受图控制，构造反事实图对 $(G_1,G_2)$，两张图共享相同起点 $s$ 和跳数 $k$，但对应的合法 $k-hop$ 终点不同，即 $G_1:s\xrightarrow{k\text{ hops}}y_1，G_2:s\xrightarrow{k\text{ hops}}y_2$，且 $y_1\neq y_2$。若模型真正遵循输入图结构，则图从 $G_1$ 被干预为 $G_2$ 时，答案也应从 $y_1$ 改为 $y_2$。但这仅是必要行为信号，模型可能没有沿图推理，而是直接利用与图干预同步变化的文本线索，为此还需要进行位置控制序列化。路径层需要检查模型生成的轨迹是否从正确起点出发、长度是否为 $k+1$ 以及每一次节点跳转是否对应输入图的真实边。最终，GIF 将两类常见的”不蕴含“命题转化为两个严格问题：$\text{答案随图变化}\not\Rightarrow\text{答案忠实于图结构}$、$\text{轨迹与答案一致}\not\Rightarrow\text{轨迹在图上合法}$。
+## 3.2 答案层诊断：图跟随能力虚胖
+
+答案层中，对于第 $j$ 个反事实图对 $(G_1^{(j)},G_2^{(j)})$，在序列化条件 $\alpha$ 下定义 $C_{\alpha}^{(j)}=\mathbb{1}\!\left[\hat y_{1,\alpha}^{(j)}=y_1^{(j)}\land \hat y_{2,\alpha}^{(j)}=y_2^{(j)}\right]$，表示模型是否在两张反事实图上均回答了正确终点。在默认的 endpoint-last 序列化下定义原始图干预敏感性（Raw Graph Intervention Sensitivity，简称 Raw GIS）$\mathrm{RawGIS}^{(j)}=C_{\mathrm{last}}^{(j)}$。为排除模型直接利用与图干预同步变化的文本线索，对同一图对构造 endpoint-first、endpoint-middle、endpoint-last 和 decoy-last 四种位置控制版本，分别表示将正确终点放在文本开头、中间、末尾，以及在文本末尾放入错误诱饵。在此基础上定义位置控制图干预敏感性（Position Controlled GIS，简称 PC-GIS）$PC-GIS^{(j)}=\prod_{\alpha\in\Sigma} C_{\alpha}^{(j)}$，即只有模型在四种条件下都作出正确响应时才有 $PCGIS^{(j)}=1$。答案层的核心诊断指标为图跟随能力虚胖（Graph-Following Inflation，简称 GFI），$\mathrm{GFI}^{(j)}=\mathrm{RawGIS}^{(j)}-\mathrm{PCGIS}^{(j)}$。为减少单个样本偶然误差，本文对所有样本级 $\mathrm{GFI}^{(j)}$ 取平均，定义数据集层面 $\mathrm{GFI}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{GFI}^{(j)}$。较高 GFI 表明模型表现出的表面敏感性很可能依赖终点位置锚定，本文将这种现象称为图跟随虚胖；较低 GFI 则必须结合 Raw GIS 解释，当 Raw GIS 本身接近 $0$ 时，较低的 GFI 应理解为模型已无法响应图变化，而非位置依赖消失。本文将 Raw GIS 作为 GFI 的辅助变量报告，同时为避免正文指标过载，将 PC-GIS 与其余辅助指标附录在附录报告。
+## 3.3 路径层诊断：自洽但非法的轨迹
+
+对于路径层的每个样本 $j$，要求模型在结构化提示下输出显式路径 $\hat p^{(j)}$ 与预测的最终答案 $\hat y^{(j)}$，并通过符号验证器检查起点是否正确（$\hat{v}_0^{(j)}=s^{(j)}$）、路径长度是否正确（$|\hat{p}^{(j)}|=k+1$）、每一步是否沿输入图中的真实边移动（$\forall i\in\{0,\dots,k-1\},\,(\hat{v}_i^{(j)},\hat{v}_{i+1}^{(j)})\in E$）以及路径终点是否等于模型给出的答案（$\hat y_{1,\alpha}^{(j)}=y_1^{(j)}$）。定义轨迹-答案一致性（Trace-Answer Consistency，简称 TAC）， $\mathrm{TAC}(\hat{p},\hat{y})=\mathbb{1}\!\left[\hat{y}^{(j)}=\hat v_m\right]$（模型自己生成的轨迹和模型自己生成的答案是否内部自洽），该变量检验模型生成路径的末节点与正确答案是否一致；定义路径合法性 $\mathrm{Path Valid}\ (\hat{p}^{(j)},G^{(j)})=\mathbb{1}\!\left[\hat{v}_0^{(j)}=s^{(j)} \land |\hat{p}^{(j)}|=k+1 \land \forall i\in\{0,\dots,k-1\},\,(\hat{v}_i^{(j)},\hat{v}_{i+1}^{(j)})\in E\right]$（起点对 + 长度对 + 逐边合法）；将 $\mathrm{TAC}^{(j)}$ 与 $\mathrm{Path\ Valid}^{(j)}$ 的差值定义为路径层的核心诊断指标自洽但非法轨迹率（Self-Consistent but Illegal Trace Gap，简称 $\Delta_{\text{illegal}}$），$\Delta_{\text{illegal}}^{(j)}=\mathrm{TAC}^{(j)}-\mathrm{Path\ Valid}^{(j)}$（这条轨迹和自己声称的答案是自洽的（末节点 = 答案），但轨迹本身在输入图上不合法），用于衡量模型给出的内部自洽的”伪推理过程“（形式完整、答案对得上路径终点，但路径里有非法边、长度错、或起点错）的样本比例。较高的 $\Delta_{\mathrm{illegal}}^{(j)}$ 表明模型能够生成形式完整且答案自洽的结构化轨迹，却没有忠实的沿输入图中的合法边推理。同理，定义数据集层面 $\Delta_{\text{illegal}}=\frac{1}{N}\sum_{j=1}^{N}\Delta_{\text{illegal}}^{(j)}$。本文将 TAC 作为 $\Delta_{\mathrm{illegal}}$ 的辅助变量报告，同时为避免正文指标过载，将 Path Valid 与其余辅助指标放在附录。
+## 3.4 主要诊断与辅助诊断
+
+GIF 在正文中保留两个主要指标：答案层的 GFI 与路径层的 $\Delta_{\mathrm{illegal}}$，二者分别对应本文关注的两类假忠实性，并具有相同的诊断形式：模型首先通过一个较弱的表面检验，但未能通过更严格的结构检验。PC-GIS、EAR、Path Valid、Path Gold Exact、Failure Hop 与完整错误分布仍然计算，但统一挪入附录。唯一保留在正文中的额外度量是 verifier-retry 场景下的 pass@K-latency 曲线，因为它承担的是缓解机制而非新的诊断命题。
+
+
+
 # 3 Graph-Intervention Faithfulness
 
 本节正式提出 Graph-Intervention Faithfulness，简称 GIF。GIF 是一个黑箱诊断框架（Diagnostic）而非benchmark，用于检验 LLM 在序列化图任务中是真正受输入图结构约束，还是由文本位置线索、答案先验或输出内部自洽性制造出表面忠实性。GIF 关注两层忠实性。
@@ -93,7 +159,7 @@ $$，其中 $y_1\neq y_2$，且对应的黄金路径分别为 $p_1^* = (s,\dots,
 
 ## 3.3 答案层评估指标：Raw GIS、PC-GIS、GFI 与 EAR
 
-这些指标用于诊断多大程度上存在位置锚定以及导致虚胖现象有多严重。在某一序列化条件 $\alpha$ 下，定义模型是否随图干预正确改变答案$C_{\alpha}^{(j)}=\mathbb{1}\!\left[f(T,\sigma_\alpha(G_1^{(j)}))=y_1^{(j)} \land f(T,\sigma_\alpha(G_2^{(j)}))=y_2^{(j)}\right]$，其中 $(G_1^{(j)},G_2^{(j)})$ 表示第 $j$ 个反事实图对，其对应终点为 $y_1^{(j)}$ 与 $y_2^{(j)}$。
+这些指标用于诊断多大程度上存在位置锚定以及导致虚胖现象有多严重。在某一序列化条件 $\alpha$ 下，定义模型是否随图干预正确改变答案，其中 $(G_1^{(j)},G_2^{(j)})$ 表示第 $j$ 个反事实图对，其对应终点为 $y_1^{(j)}$ 与 $y_2^{(j)}$。
 ### 3.3.1 原始图干预敏感性（Raw Graph Intervention Sensitivity）
 
 原始图干预敏感性（Raw Graph Intervention Sensitivity），简称 Raw GIS。对于样本 $j$，定义 $\mathrm{RawGIS}^{(j)}=C_{\mathrm{last}}^{(j)}$，其中 $C_{\alpha}^{(j)}=\mathbb{1}\!\left[\hat{y}_{1,\alpha}^{(j)}=y_1^{(j)} \land\ \hat{y}_{2,\alpha}^{(j)}=y_2^{(j)}\right]$，即模型在反事实图对 $(G_1,G_2)$ 上分别输出对应的正确终点 $y_1$ 和 $y_2$，则认为该样本在 Raw 条件下通过，使用 endpoint-last 计算，刻画在不控制终点位置时，输出是否随反事实图干预改变。为减少单个样本偶然误差，本文对所有样本级 Raw GIS 取平均，定义数据集层面 $\mathrm{Raw\ GIS}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{RawGIS}^{(j)}$。
