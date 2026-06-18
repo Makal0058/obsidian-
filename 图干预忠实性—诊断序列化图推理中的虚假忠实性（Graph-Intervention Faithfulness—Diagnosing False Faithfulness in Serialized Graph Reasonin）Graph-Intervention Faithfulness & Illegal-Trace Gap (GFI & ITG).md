@@ -91,119 +91,131 @@ y_1\neq y_2
 \text{decoy-last}
 }}
 \;\xrightarrow{\text{LLM输出答案或路径}}\;
-(\hat y,\hat{\pi})
+(\hat y,\hat p)
 \\[8pt]
 &\longrightarrow
 \left\{
 \begin{aligned}
-&\text{GFI 答案层假忠实性}
+&\text{答案层假忠实性：GFI}
 \\[8pt]
-&\text{符号路径验证Verify}(\hat{\pi},G,s,k)
+&\text{符号路径验证：Verify}(\hat p;G,s,k)
 \longrightarrow
 \left\{
 \begin{aligned}
-&\Delta_{\mathrm{illegal}}\text{-Trace Gap}
-\\[-1pt]
-&\qquad\text{路径层假忠实性}
+&\text{路径层假忠实性：}\Delta_{\mathrm{illegal}}
 \\[6pt]
-&(\mathrm{FailureHop},\mathrm{ErrorType})
+&(\mathrm{Failure Hop},\mathrm{Error Type})
 \\[-1pt]
 &\qquad\longrightarrow
-\operatorname{Verifier-Retry} \text{成本收益分析}
+\text{verifier-retry 成本—收益分析}
 \end{aligned}
 \right.
 \end{aligned}
 \right.
 \end{aligned}
 $$
-本文研究序列化图推理中的结构忠实性诊断。给定输入图及其文本序列化，模型既可能因为真正遵循图结构而改变答案，也可能因为正确终点恰好处于显著文本位置而改变答案；同样，模型既可能给出一条真实存在于输入图中的合法路径，也可能给出一条导向最终答案但包含非法边的非法路径。因此，本文主要关注两个必要但非充分的行为信号：第一，答案随图干预改变并不蕴含答案忠实于图；第二，轨迹导向正确答案并不蕴含路径忠实于图。文本的目标是提供一个黑箱诊断程序，把这两类不忠实与真正的忠实性区分开。
+GIF 研究序列化图推理中的结构忠实性诊断。令 $R$ 表示一个不可直接观测的理想事件，表示模型预测在因果上受输入图结构控制；令 $C_\alpha$ 表示一个可观测事件，表示在序列化配置 $\alpha$ 下，模型能够对反事实图干预作出正确响应。若模型忠实地遵循图结构，则应有 $R\Rightarrow C_\alpha$；反之则不成立，即 $C_\alpha\not\Rightarrow R$。对此现象，GIF 关注两类必要但非充分的行为信号：第一，答案随图干预改变并不蕴含答案忠实于图，即$\text{答案随图干预变化}\not\Rightarrow\text{答案忠实于图结构}$，因为正确终点可能恰好处于显著文本位置而改变答案（位置捷径）；第二，轨迹导向正确答案并不蕴含路径忠实于图（要求模型同时输出路径与答案），即$\text{轨迹与答案一致}\not\Rightarrow\text{轨迹在图上合法}$，因为模型可能给出一条导向最终答案但包含非法边的非法路径。
 ## 3.1 任务设定
 
-给定有向图 $G = (V,E)$（其中 $V$ 为节点集合，$E\subseteq V\times V$ 为有向边集合）、起点 $s\in V$ 以及跳数 $k$，模型需从 $s$ 出发，沿图中合法有向边移动 $k$ 跳后到达正确节点 $y$；在结构化输出设置下，模型需输出预测路径 $\hat p=(\hat v_0,\hat v_1,\ldots,\hat v_m)$ ，其中 $\hat v_0=s$，$\hat v_m=\hat y$。由于 LLM 接受的是线性化文本，因此定义序列化函数 $\sigma_\alpha(G)$，其中 $\alpha$ 表示一种具体的序列化配置，包括节点标号、边顺序、语法格式以及位置控制策略。答案层实验使用随机符号节点消除语义先验，通过无图先验控制（prior-only）和候选项限定的先验控制（candidate-only prior controls）检查无图条件下的固定答案偏好：若模型在无图条件下稳定输出某一候选答案，则该样本被视为受先验混淆的（prior-confounded）；检验模型输出是否真正受图控制，构造反事实图对 $(G_1,G_2)$，两张图共享相同起点 $s$ 和跳数 $k$，但对应的合法 $k-hop$ 终点不同，即 $G_1:s\xrightarrow{k\text{ hops}}y_1，G_2:s\xrightarrow{k\text{ hops}}y_2$，且 $y_1\neq y_2$。若模型真正遵循输入图结构，则图从 $G_1$ 被干预为 $G_2$ 时，答案也应从 $y_1$ 改为 $y_2$。但这仅是必要行为信号，模型可能没有沿图推理，而是直接利用与图干预同步变化的文本线索，为此还需要进行位置控制序列化。路径层需要检查模型生成的轨迹是否从正确起点出发、长度是否为 $k+1$ 以及每一次节点跳转是否对应输入图的真实边。最终，GIF 将两类常见的”不蕴含“命题转化为两个严格问题：$\text{答案随图变化}\not\Rightarrow\text{答案忠实于图结构}$、$\text{轨迹与答案一致}\not\Rightarrow\text{轨迹在图上合法}$。
-## 3.2 答案层诊断：图跟随能力虚胖
+给定有向图 $G = (V,E)$（其中 $V$ 为节点集合，$E\subseteq V\times V$ 为有向边集合）、起点 $s\in V$ 以及跳数 $k$，任务要求模型从 $s$ 出发，沿图中合法有向边移动 $k$ 跳后到达正确答案 $y$，其中 $y$ 称为黄金答案，这条路径称为黄金路径 $p^*$；对于第 $j$ 个样本，在结构化输出设置下，模型还需要输出预测路径 $\hat p^{(j)}=(\hat v_0^{(j)},\hat v_1^{(j)},\ldots,\hat{v}_{m_j}^{(j)})$  与预测答案 $\hat y^{(j)}$，其中 $m_j$ 可能不等于 $k$。由于 LLM 接受的是线性化文本，因此定义序列化函数 $\sigma_\alpha(G)$ 将图 $G$ 映射为模型可接受的文本序列，其中 $\alpha$ 表示节点标号、边顺序、语法格式和位置控制策略等配置。在答案层，构造共享相同起点 $s$ 和跳数 $k$ 反事实图对 $(G_1,G_2)$，但两张图正确 $k-hop$ 终点终点不同，即 $G_1:s\xrightarrow{k\text{ hops}}y_1，G_2:s\xrightarrow{k\text{ hops}}y_2$，其中 $y_1\neq y_2$。为降低节点语义、常识联想与参数记忆的影响，实验使用随机符号节点，并通过无图先验控制（prior-only）和候选项限定的先验控制（candidate-only prior controls）检查无图条件下的答案先验与候选偏好；在路径层，符号验证器检查模型输出预测路径 $\hat p$ 的起点 $\hat v_0$、长度以及每次节点跳转是否对应输入图中的真实边。为简化路径正确性判据，使判断 $\hat{p}$ 是否合法等价于判断 $\hat{p}$​ 是否等于 $p^*$ ，本文采用唯一合法路径设定。定义从起点 $s$ 出发的所有合法 $k$-hop 路径集合为 $\mathcal W(G,s,k)=\left\{(v_0,\ldots,v_k)\mid v_0=s,\ \forall i\in\{0,\ldots,k-1\},\ (v_i,v_{i+1})\in E\right\}$，则 $\mathcal W(G,s,k)=\{p^*\}$，其中 $p^*=(v_0^*,v_1^*,\ldots,v_k^*)$ 为唯一黄金路径，满足 $v_0^*=s$ 且 $v_k^*=y$，唯一性由符号枚举程序验证。此时 $\hat{p}\in\mathcal{W}(G,s,k)\iff\hat{p}=p^\ast$，$\mathrm{PathValid}^{(j)}=1\iff\mathrm{Path Gold Exact}^{(j)}=1$。定义任务级准确率 $\mathrm{Accuracy}^{(j)}=\mathbb{1}\!\left[\hat y^{(j)}=y^{(j)}\right]$，即模型预测答案与黄金答案一致的样本比例，作为后续答案层指标 Raw GIS 与 PC-GIS 的基础。
+## 3.2 答案层：GFI 与位置控制
 
-答案层中，对于第 $j$ 个反事实图对 $(G_1^{(j)},G_2^{(j)})$，在序列化条件 $\alpha$ 下定义 $C_{\alpha}^{(j)}=\mathbb{1}\!\left[\hat y_{1,\alpha}^{(j)}=y_1^{(j)}\land \hat y_{2,\alpha}^{(j)}=y_2^{(j)}\right]$，表示模型是否在两张反事实图上均回答了正确终点。在默认的 endpoint-last 序列化下定义原始图干预敏感性（Raw Graph Intervention Sensitivity，简称 Raw GIS）$\mathrm{RawGIS}^{(j)}=C_{\mathrm{last}}^{(j)}$。为排除模型直接利用与图干预同步变化的文本线索，对同一图对构造 endpoint-first、endpoint-middle、endpoint-last 和 decoy-last 四种位置控制版本，分别表示将正确终点放在文本开头、中间、末尾，以及在文本末尾放入错误诱饵。在此基础上定义位置控制图干预敏感性（Position Controlled GIS，简称 PC-GIS）$PC-GIS^{(j)}=\prod_{\alpha\in\Sigma} C_{\alpha}^{(j)}$，即只有模型在四种条件下都作出正确响应时才有 $PCGIS^{(j)}=1$。答案层的核心诊断指标为图跟随能力虚胖（Graph-Following Inflation，简称 GFI），$\mathrm{GFI}^{(j)}=\mathrm{RawGIS}^{(j)}-\mathrm{PCGIS}^{(j)}$。为减少单个样本偶然误差，本文对所有样本级 $\mathrm{GFI}^{(j)}$ 取平均，定义数据集层面 $\mathrm{GFI}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{GFI}^{(j)}$。较高 GFI 表明模型表现出的表面敏感性很可能依赖终点位置锚定，本文将这种现象称为图跟随虚胖；较低 GFI 则必须结合 Raw GIS 解释，当 Raw GIS 本身接近 $0$ 时，较低的 GFI 应理解为模型已无法响应图变化，而非位置依赖消失。本文将 Raw GIS 作为 GFI 的辅助变量报告，同时为避免正文指标过载，将 PC-GIS 与其余辅助指标附录在附录报告。
-## 3.3 路径层诊断：自洽但非法的轨迹
+为诊断答案层假忠实性，GIF 在反事实图对上检验模型答案是否随图结构改变。对于答案层第 $j$ 个反事实图对 $(G_1^{(j)},G_2^{(j)})$，在序列化条件 $\alpha$ 下定义 $C_{\alpha}^{(j)}=\mathbb{1}\!\left[\hat y_{1,\alpha}^{(j)}=y_1^{(j)}\land \hat y_{2,\alpha}^{(j)}=y_2^{(j)}\right]$。反事实图对可以检验模型答案是否随图结构变化，却无法排除序列化位置捷径。例如，两张图的正确终点均恰好出现在边列表末尾，则 LLM 直接输出最后出现的节点也会产生表面正确的反事实响应。为分离这种表面敏感性，定义答案层的核心诊断指标图跟随能力虚胖（Graph-Following Inflation，GFI）来衡量模型在默认序列化下通过反事实检验但在改变终点位置后失败的样本比例：$\mathrm{GFI}^{(j)}=\mathrm{Raw GIS}^{(j)}-\mathrm{PC-GIS}^{(j)}$，其中 Raw GIS（原始图干预敏感性）表示模型在默认 endpoint-last 序列化下，是否能在两张反事实图上分别输出正确终点，即 $\mathrm{RawGIS}^{(j)}=C_{\mathrm{last}}^{(j)}$；PC-GIS（位置控制图干预敏感性）表示模型是否能在 endpoint-first、endpoint-middle、endpoint-last 和 decoy-last 四种位置控制条件下均做出正确响应，即 $PC-GIS^{(j)}=\prod_{\alpha\in\Sigma} C_{\alpha}^{(j)}$。由于 endpoint-last 包含在位置控制集合中，因此 $\mathrm{PC-GIS}^{(j)}\leq\mathrm{Raw GIS}^{(j)}$。同时为减少单个样本偶然误差，本文对所有样本级 $\mathrm{GFI}^{(j)}$ 取平均，定义数据集层面 $\mathrm{GFI}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{GFI}^{(j)}$。较高 GFI 表明模型表现出的表面敏感性很可能依赖终点位置锚定，本文将这种现象称为图跟随虚胖；较低 GFI 则必须结合 Raw GIS 解释，当 Raw GIS 本身接近零时，较低 GFI 应理解为模型已无法稳定响应图干预，而非位置依赖消失。为直接测量模型是否被“最后出现节点”这一显著文本位置吸引，GIF 还报告干扰项后置终点锚定率（decoy-last Endpoint Anchoring Rate，EAR），记 $d^{(j)}$ 为第 $j$ 个样本中被放置在序列末尾的诱饵节点，则 $\mathrm{EAR}_{\mathrm{decoy}}^{(j)}=\mathbb{1}\!\left[\hat{y}_{\mathrm{decoy}}^{(j)}=d^{(j)}\right]$，
+## 3.3 路径层：$\Delta_{\mathrm{illegal}}$ 与符号路径验证
 
-对于路径层的每个样本 $j$，要求模型在结构化提示下输出显式路径 $\hat p^{(j)}$ 与预测的最终答案 $\hat y^{(j)}$，并通过符号验证器检查起点是否正确（$\hat{v}_0^{(j)}=s^{(j)}$）、路径长度是否正确（$|\hat{p}^{(j)}|=k+1$）、每一步是否沿输入图中的真实边移动（$\forall i\in\{0,\dots,k-1\},\,(\hat{v}_i^{(j)},\hat{v}_{i+1}^{(j)})\in E$）以及路径终点是否等于模型给出的答案（$\hat y_{1,\alpha}^{(j)}=y_1^{(j)}$）。定义轨迹-答案一致性（Trace-Answer Consistency，简称 TAC）， $\mathrm{TAC}(\hat{p},\hat{y})=\mathbb{1}\!\left[\hat{y}^{(j)}=\hat v_m\right]$（模型自己生成的轨迹和模型自己生成的答案是否内部自洽），该变量检验模型生成路径的末节点与正确答案是否一致；定义路径合法性 $\mathrm{Path Valid}\ (\hat{p}^{(j)},G^{(j)})=\mathbb{1}\!\left[\hat{v}_0^{(j)}=s^{(j)} \land |\hat{p}^{(j)}|=k+1 \land \forall i\in\{0,\dots,k-1\},\,(\hat{v}_i^{(j)},\hat{v}_{i+1}^{(j)})\in E\right]$（起点对 + 长度对 + 逐边合法）；将 $\mathrm{TAC}^{(j)}$ 与 $\mathrm{Path\ Valid}^{(j)}$ 的差值定义为路径层的核心诊断指标自洽但非法轨迹率（Self-Consistent but Illegal Trace Gap，简称 $\Delta_{\text{illegal}}$），$\Delta_{\text{illegal}}^{(j)}=\mathrm{TAC}^{(j)}-\mathrm{Path\ Valid}^{(j)}$（这条轨迹和自己声称的答案是自洽的（末节点 = 答案），但轨迹本身在输入图上不合法），用于衡量模型给出的内部自洽的”伪推理过程“（形式完整、答案对得上路径终点，但路径里有非法边、长度错、或起点错）的样本比例。较高的 $\Delta_{\mathrm{illegal}}^{(j)}$ 表明模型能够生成形式完整且答案自洽的结构化轨迹，却没有忠实的沿输入图中的合法边推理。同理，定义数据集层面 $\Delta_{\text{illegal}}=\frac{1}{N}\sum_{j=1}^{N}\Delta_{\text{illegal}}^{(j)}$。本文将 TAC 作为 $\Delta_{\mathrm{illegal}}$ 的辅助变量报告，同时为避免正文指标过载，将 Path Valid 与其余辅助指标放在附录。
-## 3.4 主要诊断与辅助诊断
+要求模型输出结构化路径能够提高推理过程的可见性，但不能保证路径中的每一步都对应输入图中的真实边。模型可能生成一条末节点与答案一致、形式完整，却包含非法跳转的轨迹。为区分“文本自洽”与“图上合法”，引入路径层的核心诊断指标自洽但非法轨迹率（Self-Consistent but Illegal Trace Gap，$\Delta_{\text{illegal}}$）来衡量较弱的表面自洽检验 TAC 与更严格的结构检验 $\mathrm{TAC}\land\mathrm{PathValid}$ 之间的差距 $\Delta_{\text{illegal}}^{(j)}=\mathrm{TAC}^{(j)}\left(1-\mathrm{Path Valid}^{(j)}\right)$[^1]，其中 TAC（轨迹-答案一致性）检查模型自己生成的轨迹与答案是否内部自洽，即 $\mathrm{TAC}(\hat{p},\hat{y})^{(j)}=\mathbb{1}\!\left[\hat{y}^{(j)}=\hat v_m^{(j)}\right]$；Path Valid（路径合法性）则用于检查模型生成的轨迹是否在输入图上结构合法，即 $\mathrm{PathValid}^{(j)}=\mathbb{1}\!\left[\hat p^{(j)}\in\mathcal{W}\!\left(G^{(j)},s^{(j)},k\right)\right]$。
 
-GIF 在正文中保留两个主要指标：答案层的 GFI 与路径层的 $\Delta_{\mathrm{illegal}}$，二者分别对应本文关注的两类假忠实性，并具有相同的诊断形式：模型首先通过一个较弱的表面检验，但未能通过更严格的结构检验。PC-GIS、EAR、Path Valid、Path Gold Exact、Failure Hop 与完整错误分布仍然计算，但统一挪入附录。唯一保留在正文中的额外度量是 verifier-retry 场景下的 pass@K-latency 曲线，因为它承担的是缓解机制而非新的诊断命题。
+为进一步区分结构忠实性与任务正确性，讨论场景 A（$\hat{y} = y$，模型答案正确）与场景 B（$\hat{y} \neq y$，模型答案错误）两种情况。场景 A 是结构化输出的最危险情形，表示模型虽然得到正确答案，却通过了一条图上非法的轨迹；场景 B 是路径层假忠实性的纯粹形式，表示模型围绕错误答案生成了一个内部自洽但非法的轨迹，两种都属于路径自洽但非法，都会被 $\Delta_{\text{illegal}}$ 捕捉到。为区分两者，引入 Accuracy 对 $\Delta_{\mathrm{illegal}}$ 进行分解。$A^{(j)}=\mathrm{Accuracy}^{(j)}\mathrm{TAC}^{(j)}\left(1-\mathrm{PathValid}^{(j)}\right)$，要求同时满足 $\hat y^{(j)}=y^{(j)},\hat v_{m_j}^{(j)}=\hat y^{(j)},\mathrm{Path Valid}^{(j)}=0$；$B^{(j)}=\left(1-\mathrm{Accuracy}^{(j)}\right)\mathrm{TAC}^{(j)}\left(1-\mathrm{PathValid}^{(j)}\right)$，要求同时满足 $\hat y^{(j)}\neq y^{(j)},\hat v_{m_j}^{(j)}=\hat y^{(j)},\mathrm{PathValid}^{(j)}=0$，两种场景正好构成全部自洽但非法的预测轨迹 $\Delta_{\mathrm{illegal}}^{(j)}=A^{(j)}+B^{(j)}$。在数据集层面定义$\Delta_{\mathrm{illegal}}^{\mathrm{correct}}=\frac{1}{N}\sum_{j=1}^{N}A^{(j)},\Delta_{\mathrm{illegal}}^{\mathrm{wrong}}=\frac{1}{N}\sum_{j=1}^{N}B^{(j)}$，因此$\Delta_{\mathrm{illegal}}=\Delta_{\mathrm{illegal}}^{\mathrm{correct}}+\Delta_{\mathrm{illegal}}^{\mathrm{wrong}}$。
 
+| 场景                 | $\mathrm{Accuracy}$ | $\mathrm{TAC}$ | $\mathrm{PathValid}$ | $\Delta_{\mathrm{illegal}}$ |
+| ------------------ | :-----------------: | :------------: | :------------------: | :-------------------------: |
+| 完全正确               |          1          |       1        |          1           |              0              |
+| 场景 A：答案正确但<br>路径非法 |          1          |       1        |          0           |              1              |
+| 场景 B：答案错误且<br>路径非法 |          0          |       1        |          0           |              1              |
+| 答案-路径末节点不一致        |        0 或 1        |       0        |          任意          |              0              |
+为定位失败发生位置，定义首次失败跳数（Failure Hop）：$\mathrm{Failure Hop}^{(j)}=\min\left\{i\in\{1,\ldots,k\}:(\hat v_{i-1}^{(j)},\hat v_i^{(j)})\notin E^{(j)}\right\}$，仅对输出格式可解析、起点正确且路径长度足以执行逐边检查的样本定义；若所有边均合法，则记为 pass。Error Type 进一步区分格式错误、起点错误、长度错误、非法边和轨迹—答案不一致，并按照预先规定的优先级进行归类。Failure Hop 与 Error Type 用于后续失败模式分析，而不作为整体忠实性的核心指标。定义黄金路径完全匹配（Path Gold Exact）用于衡量模型是否完成任务，即 $\mathrm{Path Gold Exact}\ (\hat{p},p^*)=\mathbb{1}\!\left[\hat{p}=p^*\right]$。
+## 3.4 指标角色与统一诊断结构
 
+GIF 围绕两个核心指标组织：答案层的 GFI 与路径层的 $\Delta_{\mathrm{illegal}}$。二者具有统一的诊断结构：模型通过较弱的表面检验，却未能通过更严格的结构检验。GFI 比较默认反事实响应与位置控制后的响应；$\Delta_{\mathrm{illegal}}$ 比较答案自洽与同时答案自洽和路径合法的比例。其余指标按角色分工：Raw GIS、PC-GIS、TAC 和 PathValid 是两个核心指标的组成部分；EAR 提供末位位置锚定的直接证据；Path Gold Exact 衡量任务级路径正确性；Failure Hop 与 Error Type 用于定位结构失败。它们均在正文中完成定义，为避免指标平铺造成的认知负担，后续章节只按研究问题选择性报告，同时 verifier-retry 场景下的 pass@K 与累计延迟用于衡量符号验证-重试机制的成本-收益，相关定义和实验细节在 §4 Experimental Setup 中给出。。
 
+[^1]：朴素差值 $\text{TAC} - \text{PathValid}$ 在 PathValid=1 且 TAC=0 时取 −1，使 $\Delta_{\text{illegal}}$ 失去 [0,1] 区间语义；乘积形式则始终非负且与 GFI 的代数结构对称。
+
+英文版：
 # 3 Graph-Intervention Faithfulness
 
-本节正式提出 Graph-Intervention Faithfulness，简称 GIF。GIF 是一个黑箱诊断框架（Diagnostic）而非benchmark，用于检验 LLM 在序列化图任务中是真正受输入图结构约束，还是由文本位置线索、答案先验或输出内部自洽性制造出表面忠实性。GIF 关注两层忠实性。
-
-第一层是答案层忠实性：关心的不只是模型答案是否随图干预改变，还关心这种变化在控制终点位置后是否仍然存在，即检验下面这个关系 $\text{答案随图干预改变} \nRightarrow\text{答案忠实遵循图}$。答案随图改变是图忠实性的必要条件，但不是充分证据。形式化地，令 $R$ 表示一个理想但不可直接观测的事件：模型预测结果因果上由输入图结构 $G$ 控制；令 $C_\alpha$ 表示一个可观测事件：某一序列化操作 $\sigma_\alpha$ 下，模型在反事实图对 $(G_1,G_2)$ 上分别输出对应的正确终点 $y_1$ 与 $y_2$ 。若模型真的忠实遵循图结构，则有 $R \Rightarrow C_\alpha$ ，但反之不成立 $C_\alpha \nRightarrow R$ 。原因是答案随图改变也可能来自与图干预同步变化的文本线索。例如，若 $G_1$ 中正确终点 $y_1$ 总是出现在边列表最后，$G_2$ 中正确终点 $y_2$ 也总是出现在最后，那么模型只需学会“输出最后出现的节点”就能表现出很高的图干预敏感性，位置控制正是为了诊断 $C_\alpha$ 与 $R$ 之间的缺口。第二层是路径层忠实性：关心这条路径是否真的是图中合法路径，而非仅与最终答案自洽，即检验$\text{轨迹与答案一致} \nRightarrow \text{轨迹在图上合法}$。令 TAC 表示模型输出路径的末节点是否等于模型给出的答案，PathValid 表示模型从起点出发，每一步都沿真实边移动且长度正确，则 $\mathrm{TAC}=1 \not\Rightarrow \mathrm{PathValid}=1$。换言之，模型可以生成一条与答案完全自洽，但中间存在不是图中合法边的路径。
-
-## 3.1 任务设定与反事实图对构造
-
-给定有向图 $G=(V,E)$，$V$ 为节点集合，$E\subseteq V\times V$ 为有向边集合，待评测的 LLM 为 $f$。关注一种受控定长多跳图推理任务：给定起跳点 $s\in V$ 和跳数 $k$，模型需从点 $s$ 出发，沿图中合法有向边走 $k$ 跳后输出最终到达的节点。
-
-一条长为 $k$ 的合法路径（Path Valid）记为 $p=(v_0,v_1,\dots,v_k)$，其中 $v_0=s$，$v_k=y$，且对 $\forall i\in{0,\dots,k-1}$，有 $(v_i,v_{i+1})\in E$ ，其终点 $v_k$​ 即为该路径对应的答案。由于 LLM 不能直接处理图 $G$，而是接收图的线性化文本表示。因此定义一个序列化函数 $\sigma_\alpha(G)=(x_1,x_2,\dots,x_n)$。其中 $\alpha$ 表示一种具体的序列化配置，包括节点标号、边顺序、语法格式以及位置控制策略。给定任务指令 $T$（包含起点 $s$、跳数 $k$ 及输出格式要求）和序列化图 $\sigma_\alpha(G)$，模型输出预测终点 $\hat{y}$；在结构化路径提示下，模型还需输出显式路径 $\hat{p}$，即 $f(T,\sigma_\alpha(G))\rightarrow(\hat{p},\hat{y})$；在 answer-only prompt 下，模型只输出预测终点 $\hat{y}$，此时可视为 $\hat{p}=\varnothing$。
-
-答案层为检验模型输出是否真正受图控制，构造反事实图对 $(G_1,G_2)$，两张图共享相同起点 $s$ 和跳数 $k$ ，但对应的合法 $k-hop$ 终点不同$$
+$$
 \begin{aligned}
-G_1 &: s \xrightarrow{k\text{ hops}} y_1 \\
-G_2 &: s \xrightarrow{k\text{ hops}} y_2
+&\underbrace{(T,G,s,k)}_{\text{input task and graph}}
+\;\longrightarrow\;
+\underbrace{(G_1,G_2)}_{
+\substack{
+\text{construct a counterfactual graph pair}\\
+y_1\neq y_2
+}}
+\\[6pt]
+&\xrightarrow{\;\sigma\in\Sigma_{\mathrm{pos}}\;}
+\underbrace{x_{\sigma}}_{
+\substack{
+\text{position-controlled serialization}\\
+\text{first / middle / last /}\\
+\text{decoy-last}
+}}
+\;\xrightarrow{\text{LLM outputs an answer or path}}\;
+(\hat y,\hat p)
+\\[8pt]
+&\longrightarrow
+\left\{
+\begin{aligned}
+&\text{answer-level false faithfulness: GFI}
+\\[8pt]
+&\text{symbolic path verification: Verify}(\hat p;G,s,k)
+\longrightarrow
+\left\{
+\begin{aligned}
+&\text{path-level false faithfulness: }\Delta_{\mathrm{illegal}}
+\\[6pt]
+&(\mathrm{FailureHop},\mathrm{ErrorType})
+\\[-1pt]
+&\qquad\longrightarrow
+\text{verifier-retry cost--benefit analysis}
 \end{aligned}
-$$，其中 $y_1\neq y_2$，且对应的黄金路径分别为 $p_1^* = (s,\dots,y_1), \ \ p_2^* = (s,\dots,y_2)$。如果模型输入真正遵循图结构，则图从 $G_1$ 被干预为 $G_2$ 时，答案也应从 $y_1$ 改为 $y_2$，但这仅是必要条件，模型可能没有沿图推理，而直接利用与图干预同步变化的文本线索。例如，正确终点总是出现在边列表最后。后续位置控制正是为了排除这类混淆。实验中使用随机符号节点消除语义先验，通过无图先验控制（prior-only）和候选项限定的先验控制（candidate-only prior controls）检查无图条件下的固定答案偏好。若模型在无图条件下已经稳定输出某一候选答案，则该样本可能被视为受先验混淆的（prior-confounded）。本文主实验中，prior controls 表明答案先验和候选偏好不能解释主要结果。
+\right.
+\end{aligned}
+\right.
+\end{aligned}
+$$
+GIF diagnoses structural faithfulness in serialized graph reasoning. Let $R$ denote an ideal but not directly observable event in which a model prediction is causally governed by the input graph structure, and let $C_\alpha$ denote an observable event in which the model correctly responds to a counterfactual graph intervention under serialization configuration $\alpha$. If the model faithfully follows the graph structure, then $R\Rightarrow C_\alpha$ should hold; the converse, however, does not hold, i.e., $C_\alpha\not\Rightarrow R$. GIF therefore focuses on two necessary but insufficient behavioral signals. First, an answer changing under a graph intervention does not imply that the answer is faithful to the graph, i.e., $\text{answer changes under graph intervention}\not\Rightarrow\text{answer is faithful to the graph structure}$, because the correct endpoint may happen to occupy a salient textual position and thereby alter the answer through a positional shortcut. Second, in settings where the model is required to output both a path and an answer, a trace leading to the final answer does not imply that the path is faithful to the graph, i.e., $\text{trace--answer consistency}\not\Rightarrow\text{trace is valid on the graph}$, because the model may generate a path that leads to its final answer while containing illegal edges.
 
-此外，在合法路径基础上对每个任务实例施加唯一黄金路径（Path Gold Exact）约束，给定 $(G,s,k)$，存在一条从 $s$ 出发的唯一合法路径，使得 LLM 恰好走 $k$ 跳到达标准答案 $y$，则将这条路径记为黄金路径 $p^*=(v_0,v_1,\dots,v_k)$，其终点 $y=v_k$​ 即为任务标准答案，唯一性通过符号枚举验证。需要强调的是，唯一性主要用于定义 Path Gold Exact；路径合法性、TAC 和 FailureHop 并不依赖唯一黄金路径。若需要扩展到多合法路径场景，将单一路径 $p^*$ 扩展为为黄金路径集合 $\mathcal{P}^*=\{(v_0,\dots,v_k)\mid v_0=s,\ v_k=y,\ \forall i\in\{0,\dots,k-1\},\ (v_i,v_{i+1})\in E\}$ 即可。
+## 3.1 Task Setup
 
-## 3.2 位置控制序列化
+Given a directed graph $G=(V,E)$, where $V$ is the node set and $E\subseteq V\times V$ is the directed edge set, a start node $s\in V$, and a hop count $k$, the task requires the model to start from $s$, traverse legal directed edges in the graph for exactly $k$ hops, and reach the correct answer $y$, where $y$ is referred to as the gold answer and the corresponding path is referred to as the gold path $p^{*}$. For the $j$-th instance, under the structured-output setting, the model must additionally output a predicted path $\hat p^{(j)}=(\hat v_0^{(j)},\hat v_1^{(j)},\ldots,\hat v_{m_j}^{(j)})$ and a predicted answer $\hat y^{(j)}$, where $m_j$ may differ from $k$. Because an LLM receives a linearized textual representation, we define a serialization function $\sigma_\alpha(G)$ that maps graph $G$ to a textual sequence accepted by the model, where $\alpha$ specifies configurations such as node labels, edge order, syntactic format, and position-control strategy. At the answer level, we construct a counterfactual graph pair $(G_1,G_2)$ that shares the same start node $s$ and hop count $k$ but has different correct $k$-hop endpoints, namely $G_1:s\xrightarrow{k\text{ hops}}y_1$ and $G_2:s\xrightarrow{k\text{ hops}}y_2$, where $y_1\neq y_2$. To reduce the influence of node semantics, commonsense associations, and parametric memory, the experiments use random symbolic node names and employ a graph-free prior control, termed prior-only, and a candidate-restricted prior control, termed candidate-only prior controls, to examine answer priors and candidate preferences in the absence of graph structure. At the path level, a symbolic verifier checks the start node $\hat v_0$, the length of the predicted path $\hat p$, and whether every node transition corresponds to an actual edge in the input graph. To simplify the path-correctness criterion such that determining whether $\hat p$ is valid is equivalent to determining whether $\hat p$ equals $p^{*}$, we adopt a unique-valid-path setting. We define the set of all legal $k$-hop paths from start node $s$ as $\mathcal{W}(G,s,k)=\left\{(v_0,\ldots,v_k)\mid v_0=s,\ \forall i\in\{0,\ldots,k-1\},\ (v_i,v_{i+1})\in E\right\}$ and require $\mathcal W(G,s,k)=\{p^{*}\}$, where $p^{*}=(v_0^{*},v_1^{*},\ldots,v_k^{*})$ is the unique gold path satisfying $v_0^{*}=s$ and $v_k^{*}=y$; its uniqueness is verified through symbolic enumeration. Under this setting, $\hat p\in\mathcal W(G,s,k)\iff\hat p=p^{*}$ and $\mathrm{Path\ Valid}^{(j)}=1\iff\mathrm{Path\ Gold\ Exact}^{(j)}=1$. We define task-level answer accuracy as $\mathrm{Accuracy}^{(j)}=\mathbb{1}\!\left[\hat y^{(j)}=y^{(j)}\right]$, which indicates whether the predicted answer matches the gold answer and serves as the basis for the subsequent answer-level metrics Raw GIS and PC-GIS.
 
-反事实图对可以检验模型答案是否随图改变，但无法排除序列化位置捷径，即模型可能没有沿图推理，而是直接选择文中某个显著位置的节点，例如最后出现的节点，获得较高的图干预敏感性。为此，GIF 对同一张图 $G$ 专门构造一个位置控制组 $\Sigma(G)=\{\sigma_{\text{first}}(G),\sigma_{\text{middle}}(G),\sigma_{\text{last}}(G),\sigma_{\text{decoy}}(G)\}$，其中 $\sigma_{\text{first}}$、$\sigma_{\text{middle}}$ 和 $\sigma_{\text{last}}$ 分别表示将正确终点节点置于序列化边列表的首 \ 中 \ 尾位置，这三个变体构成终点位置扫描，用于检测模型是否在不同终点位置下稳定输出结构答案；$\sigma_{\text{decoy}}$ 是一个对抗探针，将一个非正确答案（$d\neq y$）的诱饵节点 $d$ 放置于末尾位置，若模型在 decoy-last 下输出诱饵节点，说明模型可能依赖“最后出现节点”这一位置线索，而非沿图求解。若模型真正忠实于图，则对任意位置控制序列化 $\sigma_\alpha(G)\in\Sigma(G)$，模型都应输出同一个答案 $y$。
+## 3.2 Answer-Level Diagnosis: GFI and Position Control
 
-## 3.3 答案层评估指标：Raw GIS、PC-GIS、GFI 与 EAR
+To diagnose answer-level false faithfulness, GIF tests whether model answers change with the graph structure using counterfactual graph pairs. For the $j$-th answer-level counterfactual graph pair $(G_1^{(j)},G_2^{(j)})$, under serialization condition $\alpha$, we define $C_{\alpha}^{(j)}=\mathbb{1}\!\left[\hat y_{1,\alpha}^{(j)}=y_1^{(j)}\land \hat y_{2,\alpha}^{(j)}=y_2^{(j)}\right]$. A counterfactual graph pair can test whether the model answer changes with the graph structure, but it cannot rule out positional shortcuts introduced by serialization. For example, if the correct endpoints of both graphs happen to appear at the end of their respective edge lists, an LLM that simply outputs the last-mentioned node would still exhibit an apparently correct counterfactual response. To separate such superficial sensitivity from structural sensitivity, we define the core answer-level diagnostic Graph-Following Inflation (GFI), which measures the proportion of instances that pass the counterfactual test under the default serialization but fail after the endpoint position is changed, as $\mathrm{GFI}^{(j)}=\mathrm{Raw\ GIS}^{(j)}-\mathrm{PC\text{-}GIS}^{(j)}$. Here, Raw GIS, or Raw Graph Intervention Sensitivity, indicates whether the model outputs the correct endpoints for both counterfactual graphs under the default endpoint-last serialization and is defined as $\mathrm{Raw\ GIS}^{(j)}=C_{\mathrm{last}}^{(j)}$; PC-GIS, or Position-Controlled Graph Intervention Sensitivity, indicates whether the model responds correctly under all four position-controlled conditions—endpoint-first, endpoint-middle, endpoint-last, and decoy-last—and is defined as $\mathrm{PC\text{-}GIS}^{(j)}=\prod_{\alpha\in\Sigma_{\mathrm{pos}}}C_{\alpha}^{(j)}$. Because endpoint-last is included in the position-control set, $\mathrm{PC\text{-}GIS}^{(j)}\leq\mathrm{Raw\ GIS}^{(j)}$. To reduce noise from individual instances, we average the instance-level values and define the dataset-level metric as $\mathrm{GFI}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{GFI}^{(j)}$. A high GFI indicates that the model’s apparent sensitivity is likely driven by endpoint-position anchoring, a phenomenon we refer to as graph-following inflation. A low GFI must, however, be interpreted jointly with Raw GIS: when Raw GIS is already close to zero, a low GFI indicates that the model has lost the ability to respond reliably to graph interventions rather than that its positional dependence has disappeared. To directly measure whether the model is attracted to the salient textual position occupied by the last-mentioned node, GIF also reports the decoy-last Endpoint Anchoring Rate (EAR). Let $d^{(j)}$ denote the decoy node placed at the end of the serialized input for the $j$-th instance; then $\mathrm{EAR}_{\mathrm{decoy}}^{(j)}=\mathbb{1}\!\left[\hat y_{\mathrm{decoy}}^{(j)}=d^{(j)}\right]$.
 
-这些指标用于诊断多大程度上存在位置锚定以及导致虚胖现象有多严重。在某一序列化条件 $\alpha$ 下，定义模型是否随图干预正确改变答案，其中 $(G_1^{(j)},G_2^{(j)})$ 表示第 $j$ 个反事实图对，其对应终点为 $y_1^{(j)}$ 与 $y_2^{(j)}$。
-### 3.3.1 原始图干预敏感性（Raw Graph Intervention Sensitivity）
+## 3.3 Path-Level Diagnosis: $\Delta_{\mathrm{illegal}}$ and Symbolic Path Verification
 
-原始图干预敏感性（Raw Graph Intervention Sensitivity），简称 Raw GIS。对于样本 $j$，定义 $\mathrm{RawGIS}^{(j)}=C_{\mathrm{last}}^{(j)}$，其中 $C_{\alpha}^{(j)}=\mathbb{1}\!\left[\hat{y}_{1,\alpha}^{(j)}=y_1^{(j)} \land\ \hat{y}_{2,\alpha}^{(j)}=y_2^{(j)}\right]$，即模型在反事实图对 $(G_1,G_2)$ 上分别输出对应的正确终点 $y_1$ 和 $y_2$，则认为该样本在 Raw 条件下通过，使用 endpoint-last 计算，刻画在不控制终点位置时，输出是否随反事实图干预改变。为减少单个样本偶然误差，本文对所有样本级 Raw GIS 取平均，定义数据集层面 $\mathrm{Raw\ GIS}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{RawGIS}^{(j)}$。
-### 3.3.2 位置控制图干预敏感性（Position-Controlled GIS）
+Requiring the model to output a structured path improves the visibility of its reasoning process but does not guarantee that every transition corresponds to an actual edge in the input graph. A model may generate a formally complete trace whose final node agrees with its answer while still containing illegal transitions. To distinguish textual self-consistency from graph validity, we introduce the core path-level diagnostic Self-Consistent but Illegal Trace Gap, denoted by $\Delta_{\mathrm{illegal}}$, which measures the gap between the weaker surface-consistency test TAC and the stricter structural test $\mathrm{TAC}\land\mathrm{Path\ Valid}$ and is defined as $\Delta_{\mathrm{illegal}}^{(j)}=\mathrm{TAC}^{(j)}\left(1-\mathrm{Path\ Valid}^{(j)}\right)$[1](https://chatgpt.com/c/6a326560-5b08-83e8-b394-354a4734fcbd#user-content-fn-1). Here, TAC, or Trace–Answer Consistency, checks whether the trace and answer produced by the model are internally consistent and is defined as $\mathrm{TAC}(\hat p,\hat y)^{(j)}=\mathbb{1}\!\left[\hat y^{(j)}=\hat v_{m_j}^{(j)}\right]$; Path Valid checks whether the generated trace is structurally valid on the input graph and is defined as $\mathrm{Path\ Valid}^{(j)}=\mathbb{1}\!\left[\hat p^{(j)}\in\mathcal W\!\left(G^{(j)},s^{(j)},k\right)\right]$.
 
-Position-Controlled GIS，简称 PC-GIS。对于样本 $j$，定义$\mathrm{PC-GIS}^{(j)}=\prod_{\alpha\in\Sigma}C_{\alpha}^{(j)}$，即模型在 endpoint-first \ middle \ last 和 decoy-last 四种条件下都作出正确响应时，才有$\mathrm{PC-GIS}^{(j)}=1$。同理，数据集层面 PC-GIS 是所有样本级 PC-GIS 的平均值，$\mathrm{PC-GIS}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{PC-GIS}^{(j)}$。PC-GIS 比 Raw GIS 更严格，因为它要求模型的图干预敏感性不能依赖某个特定的终点位置。
-### 3.3.3 图跟随能力虚胖（Graph-Following Inflation）
+To further distinguish structural faithfulness from task correctness, we consider two cases: Case A, in which $\hat y=y$ and the model answer is correct, and Case B, in which $\hat y\neq y$ and the model answer is incorrect. Case A is the most concerning outcome under structured output because the model obtains the correct answer through a trace that is invalid on the graph. Case B is a pure form of path-level false faithfulness in which the model constructs an internally consistent but illegal trace around an incorrect answer. Both cases are self-consistent but illegal and are therefore captured by $\Delta_{\mathrm{illegal}}$. To distinguish them, we use Accuracy to decompose $\Delta_{\mathrm{illegal}}$. Case A is defined as $A^{(j)}=\mathrm{Accuracy}^{(j)}\mathrm{TAC}^{(j)}\left(1-\mathrm{Path\ Valid}^{(j)}\right)$ and requires $\hat y^{(j)}=y^{(j)}$, $\hat v_{m_j}^{(j)}=\hat y^{(j)}$, and $\mathrm{Path\ Valid}^{(j)}=0$; Case B is defined as $B^{(j)}=\left(1-\mathrm{Accuracy}^{(j)}\right)\mathrm{TAC}^{(j)}\left(1-\mathrm{Path\ Valid}^{(j)}\right)$ and requires $\hat y^{(j)}\neq y^{(j)}$, $\hat v_{m_j}^{(j)}=\hat y^{(j)}$, and $\mathrm{Path\ Valid}^{(j)}=0$. The two cases exactly partition all self-consistent but illegal predicted traces, such that $\Delta_{\mathrm{illegal}}^{(j)}=A^{(j)}+B^{(j)}$. At the dataset level, we define $\Delta_{\mathrm{illegal}}^{\mathrm{correct}}=\frac{1}{N}\sum_{j=1}^{N}A^{(j)}$ and $\Delta_{\mathrm{illegal}}^{\mathrm{wrong}}=\frac{1}{N}\sum_{j=1}^{N}B^{(j)}$, and therefore $\Delta_{\mathrm{illegal}}=\Delta_{\mathrm{illegal}}^{\mathrm{correct}}+\Delta_{\mathrm{illegal}}^{\mathrm{wrong}}$.
 
-Graph-Following Inflation，简称 GFI。对样本 $j$，定义 $\mathrm{GFI}^{(j)}=\mathrm{RawGIS}^{(j)}-\mathrm{PCGIS}^{(j)}$，衡量 Raw GIS 与 PC-GIS 之间的差距，当 Raw GIS 较高而 PC-GIS 较低时，GFI 会升高，说明输出看似随图干预改变答案，但这种表面敏感性很可能依赖终点位置锚定：一旦正确终点不再稳定处于显著位置，模型就无法稳定输出图结构决定的答案，本文将这种现象称为图跟随虚胖，即模型的表面图敏感性被终点位置等文本捷径高估。需要注意的是，GFI 的解释必须以 Raw GIS 为前提，若 Raw GIS 本身已经很低，则模型在默认条件下已经不能稳定随图改变答案，此时不应把低 GFI 解读为位置锚定被消除，而应怀疑图干预敏感性崩塌。同上，数据集层面的 GFI 定义为 $\mathrm{GFI}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{GFI}^{(j)}$。
-### 3.3.4 终点锚定率（Endpoint Anchoring Rate)
+|Case|$\mathrm{Accuracy}$|$\mathrm{TAC}$|$\mathrm{Path\ Valid}$|$\Delta_{\mathrm{illegal}}$|
+|---|:-:|:-:|:-:|:-:|
+|Fully correct|1|1|1|0|
+|Case A: correct answer but<br>illegal path|1|1|0|1|
+|Case B: incorrect answer and<br>illegal path|0|1|0|1|
+|Answer–path-endpoint mismatch|0 or 1|0|arbitrary|0|
 
-为直接测量模型是否被显著位置吸引，GIF 还报告干扰项后置终点锚定率（decoy-last Endpoint Anchoring Rate），简称 EAR。沿用 3.2 decoy-last 设定，记 $d^{(j)}$ 为第 $j$ 个样本中被放置在序列末尾的诱饵节点，定义样本级 EAR 为 $\mathrm{EAR}_{\mathrm{decoy}}^{(j)}=\mathbb{1}\!\left[\hat{y}_{\mathrm{decoy}}^{(j)}=d^{(j)}\right]$，其中 ($\hat{y}_{\text{decoy}}^{(j)}$) 表示模型在 decoy-last 条件下的输出答案，类似的，数据集层面 $\mathrm{EAR}_{\mathrm{decoy}}=\frac{1}{N}\sum_{j=1}^{N}\mathrm{EAR}_{\mathrm{decoy}}^{(j)}$。相比 endpoint-last，EAR 能更直接的识别终点位置锚定，因为 endpoint-last 中最后出现节点就是正确答案，因此模型输出该节点可能因为模型真正实现图跟随，也可能是末位位置捷径；而在 decoy-last 中，最后出现节点被替换为错误诱饵 $d^{(j)}$，将正确答案与末位位置线索解耦。若模型仍输出 $d$，则说明其更可能依赖“最后出现节点”这一文本位置线索。
+To localize where a failure first occurs, we define Failure Hop as $\text{Failure Hop}^{(j)}=\min\left\{i\in\{1,\ldots,k\}\mid(\hat v_{i-1}^{(j)},\hat v_i^{(j)})\notin E^{(j)}\right\}$. Failure Hop is defined only for instances whose outputs are parseable, whose start nodes are correct, and whose path lengths are sufficient for edge-by-edge inspection; if every edge is valid, the instance is recorded as pass. Error Type further distinguishes format errors, start-node errors, length errors, illegal-edge errors, and trace–answer inconsistencies according to a predefined priority order. Failure Hop and Error Type are used for subsequent failure-pattern analysis rather than as core measures of overall faithfulness. We define exact gold-path matching, termed Path Gold Exact, to measure whether the model completes the path-level task, as $\mathrm{Path\ Gold\ Exact}(\hat p,p^{*})=\mathbb{1}\!\left[\hat p=p^{*}\right]$.
 
-## 3.4 路径层指标：TAC、PathValid、PathGoldExact 与 FailureHop
+## 3.4 Metric Roles and Unified Diagnostic Structure
 
-只靠模型给出正确答案或答案随图干预改变无法说明真的沿图走了一条合法路径，特别是在结构化 CoT 或 JSON path 输出中，模型可能生成一条看似完整、且终点与答案一致的路径，但其中某些边不合法。因此，GIF 进一步引入路径层指标，用于区分“文本自洽”与“图上合法”。设模型输出路径为 $\hat{p}=(\hat{v}_0,\hat{v}_1,\dots,\hat{v}_m)$(模型可能输出非 $k$ 长度)，输出答案为 $\hat{y}$。
+GIF is organized around two core metrics: GFI at the answer level and $\Delta_{\mathrm{illegal}}$ at the path level. The two metrics share a unified diagnostic structure in which a model passes a weaker surface-level test but fails a stricter structural test. GFI compares the default counterfactual response with the response obtained after position control, whereas $\Delta_{\mathrm{illegal}}$ compares trace–answer consistency with the joint satisfaction of trace–answer consistency and path validity. The remaining metrics serve distinct roles: Raw GIS, PC-GIS, TAC, and Path Valid are components of the two core metrics; EAR provides direct evidence of final-position anchoring; Path Gold Exact measures task-level path correctness; and Failure Hop and Error Type localize structural failures. All metrics are defined in the main text, but to avoid presenting them with equal visual prominence and imposing unnecessary cognitive load, subsequent sections report them selectively according to the relevant research question. In verifier-retry settings, pass@$K$ and cumulative latency are used to evaluate the cost–benefit trade-off of symbolic verification with retry; their definitions and experimental details are provided in Section 4, Experimental Setup.
 
-### 3.4.1 轨迹-答案一致性（Trace-Answer Consistency）
+Footnotes：
+1. The naive difference $\mathrm{TAC}-\mathrm{Path\ Valid}$ takes the value $-1$ when $\mathrm{Path\ Valid}=1$ and $\mathrm{TAC}=0$, causing $\Delta_{\mathrm{illegal}}$ to lose its $[0,1]$ range interpretation; the multiplicative form is always nonnegative and algebraically symmetric with GFI.
 
-Trace-Answer Consistency，简称 TAC，定义 $\mathrm{TAC}(\hat{p},\hat{y})=\mathbb{1}\!\left[\hat{y}=\hat{v}_m\right]$(只关注末节点，不关注长度)，用于检查路径终点是否等于最终答案。TAC 高说明模型输出内部自洽，即声称的路径终点与最终答案一致，然而该路径不一定真的存在于图上。
-### 3.4.2 路径合法性（Path Validity）
-
-定义 $\mathrm{Path\ Valid}\ (\hat{p},G)=\mathbb{1}\!\left[\hat{v}_0=s \land |\hat{p}|=k+1 \land \forall i\in\{0,\dots,k-1\},\,(\hat{v}_i,\hat{v}_{i+1})\in E\right]$，用于检查模型输出路径是否为输入图上的合法 $k-hop$ walk，同时执行三个检查：起点是否正确 $\hat{v}_0=s$、路径长度是否正确 $|\hat{p}|=k+1$、每一步是否为合法边 $\forall i\in\{0,\dots,k-1\},\ (\hat{v}_i,\hat{v}_{i+1})\in E$。注意，PathValid 检查的是 $|\hat{p}|=k+1$（长度是否正确），TAC 只关注末节点是否等于答案
-### 3.4.3 自洽但非法的轨迹缺口（Self-Consistent but Illegal Trace Gap）
-
-定义路径层诊断的核心信号非法路径差距 $\Delta_{\text{illegal}}$，其中 $\Delta_{\text{illegal}}=\mathrm{TAC}-\mathrm{Path\ Valid}$，用于量化“轨迹自洽但图上非法”的失败模式，TAC 较高而 PathValid 较低时 $\Delta_{\text{illegal}}$ 增大，此时模型生成与答案一致但不是图上的合法路径的结构化轨迹，即 $\mathrm{TAC}=1 \nRightarrow \mathrm{PathValid}=1$。
-### 3.4.4 黄金路径完全匹配（Path Gold Exact）
-
-定义黄金路径完全匹配（Path Gold Exact），在 3.1 的唯一黄金路径设定下，定义 $\mathrm{Path\ Gold\ Exact}\ (\hat{p},p^*)=\mathbb{1}\!\left[\hat{p}=p^*\right]$，唯一黄金路径是 $p^*$ 本身；Path Gold Exact 是检查 $\hat{p}$​ 是否等于 $p^*$ 的指标。
-### 3.4.5 首次失败跳数（FailureHop）
-
-为了定位模型从哪一步开始偏离图结构，将颗粒度从路径细化为第几跳，引入 $\operatorname{FailureHop}\ (\hat{p},G)=\min\left\{i\in\{1,\dots,k\}:(\hat{v}_{i-1},\hat{v}_i)\notin E\right\}$，FailureHop 只定义非法边位置，若路径长度足够且起点正确，则 FailureHop 记录第一条非法边所在的 hop；若全部边均合法，则 FailureHop 记为 pass；错误类型（长度 \ 起点 \ 格式 \ 非法边)单独作为 error type 记录。FailureHop 对于分析分叉图尤其重要，因为模型可能反复在早期分叉点、终端转移或特定状态更新位置失败。
-
-## 3.5 符号验证器与重试机制（Symbolic Verifier and Retry）
-
-再使用 GIF 诊断模型原始行为后，本文还尝试了两种缓解机制：内部预算推理（思考模式） vs 外部符号反馈（verifier-retry），本节主要介绍 verifier-retry 的概念。对样本 $j$，定义第 $t$ 次尝试输出为 $(\hat{p}_{j,t},\hat{y}_{j,t})$，使用符号验证器检查以下条件：输出是否可解析为指定格式、路径是否从起点 $s$ 出发、路径长度是否为 $k+1$、 每一条边是否属于输入图 $G$、路径终点是否等于模型答案 $\hat{y}_{j,t}$。需要强调的是， verifier-retry 不泄露黄金答案 $y$，也不告诉模型正确下一跳，只在离线评估阶段计算黄金答案正确性。若验证失败，验证器返回结构性错误反馈，例如：
-```text
-Your path is invalid at hop 3:
-edge (J9E9, W6S2) does not exist in the graph.
-Please retry with a valid k-hop path from the given start node.
-```
-模型随后重新生成路径和答案，最多尝试 $K$ 次。记样本 $j$ 第一次通过验证的尝试编号为 $\tau_j=\min\{t:\mathrm{Verifier\ Pass}_{j,t}=1\}$，若在 $K$ 次内始终未通过，则记为 $\tau_j=\infty$。在此基础上定义 $\mathrm{pass@}K=\frac{1}{N}\sum_{j=1}^{N}\mathbb{1}\!\left[\tau_j\le K\right]$，即最多尝试 $K$ 次，只要其中任意一次通过 verifier，就算这个样本成功。
-
-除了 $pass@K$， verifier-retry 还记录每次尝试的延迟，设样本 $j$ 第 $t$ 次尝试延迟为 $\ell_{j,t}$，则预算 $K$ 下累计延迟为 $L_j^{(K)}=\sum_{t=1}^{\min(\tau_j,K)}\ell_{j,t}$。同理，数据集平均累计延迟为 $L^{(K)}=\frac{1}{N}\sum_{j=1}^{N}L_j^{(K)}$。最终得到成本—效果曲线 $\left(\mathrm{pass@}1,L^{(1)}\right),\left(\mathrm{pass@}2,L^{(2)}\right),\dots,\left(\mathrm{pass@}K,L^{(K)}\right)$，对于达到预算 $K$ 后仍未通过 verifier 的样本，进一步统计其第 $K$ 次输出的最终错误类型（error type）和最终 FailureHop 分布，用于判断失败是随机噪声，还是稳定结构瓶颈。如果模型在多次 retry 后仍反复卡在同一 hop，则说明 verifier 能发现错误，但模型本身缺少修复该错误所需的状态更新能力。因此，verifier-retry 有双重作用，既是一个低成本修复机制，用于检验外部符号反馈能否提高路径合法性；也是一个诊断工具，用于区分“模型能在反馈下修正路径”与“模型反复卡在同一结构转移处”这两种情况。
 
 ---
 # 4 Experimental Setup
@@ -271,7 +283,7 @@ Chain graphs 用于检测仅答案（answer-only）设置下的终点位置捷�
   "answer": "Y"
 }
 ```
-该设置让路径级指标可被计算，包括 TAC、PathValid、PathGoldExact 和 FailureHop。
+该设置让路径级指标可被计算，包括 TAC、PathValid、Path Gold Exact 和 FailureHop。
 
 `jsoncot_strict` 在 `jsoncot_basic` 基础上加入更严格的格式约束。模型必须输出严格 JSON，不得包含额外文本；路径应包含 ($k+1$) 个节点，应从起点 $s$ 开始，预测终点应等于路径最后一个节点。需要注意的是，这些约束只是提示层面的格式与结构要求，并不保证模型实际生成的每条边都属于输入图。因此，所有结构化输出仍需进行符号路径验证。
 
