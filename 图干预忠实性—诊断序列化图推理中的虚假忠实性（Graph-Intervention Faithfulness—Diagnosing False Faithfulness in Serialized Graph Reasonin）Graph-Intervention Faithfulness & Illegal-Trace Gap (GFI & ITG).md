@@ -388,13 +388,13 @@ GPT-5.4-mini 的结果来自第三方 OpenAI-compatible 中转服务。因此，
 
 本文使用五类 prompt，其中前三类用于图任务实验，后两类用于 prior controls。
 
-|Prompt|输出形式|设计目的|
-|---|---|---|
-|direct_minimal|仅答案|检测 answer-only 设置下的终点位置捷径|
-|jsoncot_basic|JSON 路径与答案|使路径层诊断成为可能，并作为结构化输出基础条件|
-|jsoncot_strict|严格 JSON 路径与答案|强调起点、长度、逐边合法性和轨迹—答案一致性要求|
-|prior_only|仅答案，无图|检查无图条件下的固定答案先验|
-|candidate_only_prior|仅答案，有候选项但无图|检查候选集合与候选位置是否引入固定偏好|
+| Prompt               | 输出形式          | 设计目的                      |
+| -------------------- | ------------- | ------------------------- |
+| direct_minimal       | 仅答案           | 检测 answer-only 设置下的终点位置捷径 |
+| jsoncot_basic        | JSON 路径与答案    | 使路径层诊断成为可能，并作为结构化输出基础条件   |
+| jsoncot_strict       | 严格 JSON 路径与答案 | 强调起点、长度、逐边合法性和轨迹—答案一致性要求  |
+| prior_only           | 仅答案，无图        | 检查无图条件下的固定答案先验            |
+| candidate_only_prior | 仅答案，有候选项但无图   | 检查候选集合与候选位置是否引入固定偏好       |
 
 `direct_minimal` 只要求模型输出最终预测终点，不要求生成路径，因此主要用于答案层指标 Raw GIS、PC-GIS、GFI 和 EAR。
 
