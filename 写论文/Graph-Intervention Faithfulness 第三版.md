@@ -1326,6 +1326,8 @@ B -> D3
 
 
 ---
+[1] Can Language Models Solve Graph Problems in Natural Language?
+
 ### 🎯 第一梯队 · 定义 GIF 自身 / 直接动机（4 篇，最核心）
 
 [1]**图没变，字变了：LLM 图推理的序列化不变性危机**（Lost in Serialization）— GIF 最近邻，序列化不变性危机 = 引言第 2–3 段的直接动机。
