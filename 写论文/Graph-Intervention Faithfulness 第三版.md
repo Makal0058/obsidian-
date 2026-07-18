@@ -1326,7 +1326,7 @@ B -> D3
 
 
 ---
-[1] Can Language Models Solve Graph Problems in Natural Language?
+
 
 ### 🎯 第一梯队 · 定义 GIF 自身 / 直接动机（4 篇，最核心）
 
