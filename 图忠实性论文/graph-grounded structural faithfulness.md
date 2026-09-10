@@ -8,9 +8,9 @@
 
 为回答这一问题，本文提出 Graph-Intervention Faithfulness（GIF）评测框架，从答案层和路径层进行互补诊断。在答案层，GIF 结合配对反事实图与受控序列化，区分基于图结构的推理与依赖文本呈现的表面成功；在路径层，GIF 将模型生成路径与当前输入图逐边比对，区分路径—答案一致性与结构合法性。
 
-实验显示，三个未启用显式推理的模型在四跳链式图中，在仅要求输出答案配置下，模型的准确率达到 38.00%–71.00%，但在同时控制反事实图和序列化因素后均降至 0%。在十二跳分叉图中，模型生成路径的终点与其最终答案一致的比例达到 79.88%–99.31%，而逐边合法率仅为 65.58%–89.21%；移除关键支持边后，模型生成图外路径的风险进一步增加，相同趋势也出现在 MQuAKE 与 KQA Pro 派生实验中。
+实验显示，在四跳链式图的仅输出答案配置下，黄金终边位于文本末尾时，三个主要模型配置的反事实图对成功率为 38.00%–71.00%；要求同一图对在全部控制条件下均回答正确时，联合成功率均降至 0%。在十二跳分叉图中，模型生成路径的终点与其最终答案一致的比例达到 79.88%–99.31%，而逐边合法率仅为 65.58%–89.21%；移除关键支持边后，模型生成图外路径的风险进一步增加，相同趋势也出现在 MQuAKE 与 KQA Pro 派生实验中。
 
-在未提供显式退出动作的两类合成图受控冲突中，三个模型配置更常维持规定长度或候选答案，而牺牲逐边合法性；提供显式退出动作能够改变冲突下的响应分布。
+在未提供显式退出动作的两类合成图受控冲突中，三个模型配置更常维持输出长度形式或候选答案，但未能同时给出满足图结构要求的有效路径；提供显式退出动作能够改变冲突下的响应分布。
 
 关键词：图推理；忠实性；反事实评估；序列化；符号验证。
 # 1 引言
@@ -31,13 +31,13 @@
 
 第二，本文发现，末次竞争位置的路径选择对局部同源竞争敏感。在严格配对条件下，仅增加一个局部可达的同源零出度竞争者，就使全部 18 个设置中通过该决策点的成功率下降 5.75–25.25 个百分点。此外，延展正确候选的后续路径，使 GPT 与 Qwen 在局部任务中的首跳选择正确率分别提高 40.40 和 37.63 个百分点；由于该干预同时改变了规定跳数、终点距离与后续路径结构，这一结果仅作为描述性证据。
 
-第三，本文发现，在未提供显式退出动作的两类合成图受控冲突中，三个未启用推理模式的模型配置更常维持规定长度或候选答案，而牺牲逐边合法性。MQuAKE 与 KQA Pro 各 200 例的派生实验均显示，关键支持边移除相对于安慰剂处理会增加三个模型的图外转移；但在 KQA Pro 中，GPT 与 Qwen 明确更常生成到达候选但不合法的路径，DeepSeek 的相对取舍方向尚不明确。提供显式退出动作也能够改变冲突下的响应分布。因此，图外生成风险的增长比统一的取舍方向更具跨设置一致性。
+第三，本文发现，在未提供显式退出动作的两类合成图受控冲突中，三个主要模型配置更常维持输出长度形式或候选答案，但未能同时给出满足图结构要求的有效路径。MQuAKE 与 KQA Pro 各 200 例的派生实验均显示，关键支持边移除相对于安慰剂处理会增加三个模型的图外转移；但在 KQA Pro 中，GPT 与 Qwen 明确更常生成到达候选但不合法的路径，DeepSeek 的相对取舍方向尚不明确。提供显式退出动作也能够改变冲突下的响应分布。因此，图外生成风险的增长比统一的取舍方向更具跨设置一致性。
 # 2. 相关工作
 ## 2.1 忠实性的参照对象与测量方法
 
 在自然语言解释与 CoT 领域，已积累了大量大语言模型的忠实性研究。在概念界定上，早期研究 [4] 区分了合理性（plausibility）与忠实性（faithfulness），强调解释令人信服并不意味着它准确反映了模型的实际推理过程；Parcalabescu 与 Frank [9] 指出，仅比较可观察输出之间的一致关系，只能说明输出层面的自洽，而不能证明其忠实于模型内部计算。
 
-在测量方法上，Turpin 等人 [10] 从模型解释中构造两类反事实预期：解释声称依赖的证据被改变时预测应相应改变；解释未提及的偏置信号被改变时预测应保持稳定；Breaking the Chain [11] 则编辑模型自生成的中间结构，检验答案是否随之更新，本文与其共享表面自洽不足这一诊断思路。二者都属于干预式诊断。RAGAS [12] 将生成回答分解为若干陈述，并逐项判断各陈述是否能够由检索上下文推出。
+在测量方法上，Turpin 等人 [10] 通过在输入中加入偏置信号，发现模型答案受到影响，但生成的思维链解释往往不提及这些信号的作用；Breaking the Chain [11] 则编辑模型自生成的中间结构，检验答案是否随之更新，本文与其共享表面自洽不足这一诊断思路。二者都属于干预式诊断。RAGAS [12] 将生成回答分解为若干陈述，并逐项判断各陈述是否能够由检索上下文推出。
 
 本文借鉴干预式诊断与逐项核验，但将答案层的参照对象由模型内部决策依据转为外部可验证的输入图。在路径层，本文进一步将语义支持关系替换为路径跳转与输入图边集合之间的确定性符号关系。
 ## 2.2 序列化线索与路径证据
@@ -46,16 +46,16 @@
 
 路径层面，已有工作通过图上检索或搜索获得支持答案的路径，并由该过程事前保证其逐边合法性：RoG 通过关系路径规划与知识图谱检索获得具体路径 [8]，FiDeLiS 则在图上逐步搜索构造推理路径 [13]。这类方法区分了模型生成的轨迹与经图上检索或搜索得到的路径，而未将二者直接等同。G-Retriever [14] 则检索与问题相关的子图，为生成提供显式结构依据，并通过核对回答所引用的节点和边是否存在于原图，评估图外生成现象，发现其方法能够减少此类错误。
  
-在 GCR 撤去图约束的案例中，可以观察到模型生成的路径终止于一个与同一输出中的答案字段不同的实体 [GCR]；对于答案与路径的联合评估，与本文最接近的工作是 Dai 等人 [15] 将答案正确与路径合法的合取作为更严格的成功判据，不同的是，本文的路径层检验不以答案正确为前提，因而在答案错误的样本上仍有定义。
+在 GCR 撤去图约束的案例中，可以观察到模型生成的路径终止于一个与同一输出中的答案字段不同的实体 [21]；对于答案与路径的联合评估，与本文最接近的工作是 Dai 等人 [15] 将答案正确与路径合法的合取作为更严格的成功判据，不同的是，本文的路径层检验不以答案正确为前提，因而在答案错误的样本上仍有定义。
 ## 2.3 输出契约与约束竞争
 
 已有研究表明，无论是仅改变 prompt 的表面形式，还是改变模型必须遵守的输出规则，都会影响其行为。Sclar 等人 [16] 表明，在语义基本不变的情况下，仅改变分隔符、大小写等表层格式，也可能造成显著的性能差异；Tam 等人 [17] 则发现，将自由回答改为 JSON 等受约束输出，会显著改变模型在推理任务中的表现。这些研究提示，输出要求并非对模型行为没有影响的测量设置。本文因此区分仅输出答案与同时输出路径的契约，分别报告其诊断结果。
 
 在指令遵循方面，IFEval [18] 选取可由确定性程序检验的指令，以减少人工或模型裁判带来的主观性。本文同样采用确定性程序核验，但关注的是生成路径对当前输入图的结构遵循，需要将路径中的每次转移与输入图的边集合比对。
 
-关于多约束执行困难，ComplexBench [19] 考察多项约束的组合结构；Control Illusion [20] 则构造了彼此互斥且可程序验证的约束，并指定其中一项具有更高优先级，发现模型不能稳定服从该优先级，其选择还会受到约束类型偏好的影响。
+关于多约束执行困难，ComplexBench [19] 考察多项约束的组合结构；Control Illusion [20] 构造互斥且可程序验证的约束，既考察指定优先级时的执行情况，也通过未指定优先级的基线分析约束偏向，发现模型不能稳定遵守指定优先级。
 
-与 Control Illusion 预先指定约束优先级不同，本文不规定哪项约束应被优先满足，而是分别构造规定长度与逐边合法性、候选答案与逐边合法性无法同时满足的两类情形，考察模型的响应取舍及显式退出动作的影响。比较两类冲突中的共同模式，也为检验约束核验成本是否与失败分配有关提供线索；由于任务目标属性与核验方式未被独立操纵，本文仅将其作为待检验的解释，而不作因果归因。
+本文关注任务目标与当前输入图结构约束之间的冲突，分别构造规定长度与逐边合法性、候选到达与逐边合法性无法同时满足的两类情形，以输入图边集合核验生成路径，并考察显式退出动作对响应分布的影响。比较两类冲突中的共同模式，也为检验约束核验成本是否与失败分配有关提供线索；由于任务目标属性与核验方式未被独立操纵，本文仅将其作为待检验的解释，而不作因果归因。
 # 3 问题定义与双层诊断
 
 本文考察以图的文本序列化为输入的图推理任务。首先定义一般的图任务，随后说明两类假忠实性的诊断指标以及诊断实验据此暴露的两类异常，最后给出受控实验使用的结果指标。实例生成规则、prompt 原文及诊断指标的详细说明见附录 A。
@@ -91,7 +91,7 @@ $S_{\mathrm{last}}$、$S_{\mathrm{serial}}$ 与 $S_{\mathrm{full}}$ 构成逐步
 
 受控实验报告四类响应的完整分布，用于观察约束与可用响应的改变如何重新分配失败行为。在长度要求开启时，$S$ 仍违反长度要求；只有输出契约提供显式退出动作时，$R$ 才是允许的合规响应，且不等同于恢复合法完整路径。
 
-候选答案与逐边合法性的取舍。对候选答案—逐边合法性冲突实验，将缺失证据条件下的响应按结构分为：路径到达候选答案但未通过结构合法性检验、路径保持图上合法但未到达候选答案、两者均满足、两者均不满足或未输出路径。令 $E^{(j)}=1$ 表示模型在配对的完整证据条件下生成了到达候选答案的合法支持路径。主要结果量定义为 $\theta=\Pr(\text{路径到达候选但违反逐边合法性}\mid E=1)-\Pr(\text{路径逐边合法但未到达候选}\mid E=1)$。正负号分别表示前一类或后一类响应更常见；这里的候选保持依据路径终点判定，答案字段是否保留候选另行统计。主分析限定于 $E=1$ 的配对实例，以排除模型在完整证据条件下本来就无法完成任务的情况；另在全部预定实例上直接计算两类响应比例之差，作为固定分母敏感性分析。完整分类与分母规则见附录 B.4。
+候选答案与逐边合法性的取舍。对候选答案—逐边合法性冲突实验，将缺失证据条件下的响应按结构分为：路径到达候选答案但未通过结构合法性检验、路径通过结构合法性检验但未到达候选答案、两者均满足、两者均不满足或未输出路径。令 $E^{(j)}=1$ 表示模型在配对的完整证据条件下生成了到达候选答案的合法支持路径。主要结果量定义为 $\theta=\Pr(\text{路径到达候选但结构检验失败}\mid E=1)-\Pr(\text{路径通过结构检验但未到达候选}\mid E=1)$。正负号分别表示前一类或后一类响应更常见；这里的候选保持依据路径终点判定，答案字段是否保留候选另行统计。主分析限定于 $E=1$ 的配对实例，以排除模型在完整证据条件下本来就无法完成任务的情况；另在全部预定实例上直接计算两类响应比例之差，作为固定分母敏感性分析。完整分类与分母规则见附录 B.4。
 # 4 实验设计
 
 本章说明各项结论的识别依据，方括号内为配对 bootstrap 估计的 95% 置信区间，重采样单位见相应实验附录，各受控实验的完整设置见附录 B。
@@ -122,7 +122,7 @@ $D=1\rightarrow2$ 仅将一条边在原行原位反转；除该干预外，其�
 主要分析仅保留模型在完整证据条件下成功生成合法支持路径的配对实例，并以 §3.3 定义的 $\theta$ 衡量支持边被移除后，模型更常维持候选答案还是逐边合法性。另以全部 400 个预定配对实例为固定分母进行敏感性分析。置信区间以基于 sample_id 为聚类单位，通过配对 bootstrap 估计。
 ## 4.3 基准数据派生的受控迁移验证
 
-为检验合成图结论能否迁移到具有真实实体与关系来源的图路径，本文在 MQuAKE、KQA Pro 上构造相同逻辑的受控证据消融。每个实例包含完整证据、缺失证据和安慰剂三个配对条件：完整证据保留支持候选答案的路径；缺失证据删除或原位反向一条关键支持边；安慰剂条件在保持边数和局部删除来源可比的前提下，处理一条非支持边。所有结构判定仅以当前条件中实际显示的图为依据，不将模型参数知识视为图证据。
+为检验合成图结论能否迁移到具有真实实体与关系来源的图路径，本文在 MQuAKE [22]、KQA Pro [23] 上构造相同逻辑的受控证据消融。每个实例包含完整证据、缺失证据和安慰剂三个配对条件：完整证据保留支持候选答案的路径；缺失证据删除或原位反向一条关键支持边；安慰剂条件在保持边数和局部删除来源可比的前提下，处理一条非支持边。所有结构判定仅以当前条件中实际显示的图为依据，不将模型参数知识视为图证据。
 
 MQuAKE 与 KQA Pro 均使用 200 个四跳支持路径实例，各完成三个模型、三个证据条件的 1,800 次成功调用。MQuAKE 额外要求输出恰好四跳，而 KQA Pro 的四跳仅指完整证据中的支持路径长度，不额外限制输出跳数。MQuAKE 主要比较缺失证据相对于安慰剂条件的“路径到达候选且含图外转移”比例差及任意图外转移比例差；KQA 分别报告路径到达候选但检验失败与任意图外转移的比例差。两项实验的主要迁移比例差均以全部 200 个预定实例为分母；取舍指标的主分析则限定于完整证据下路径到达候选且结构合法的实例。为区分逐边合法性与长度合规，MQuAKE 另对已有输出进行不含长度要求的补充评分，保留原四跳评分，并以 $\theta_{\mathrm{edge}}$ 描述补充评分下的响应取舍。完整构造、prompt 与评分规则见附录 B.5，模型接口与批次记录见附录 A.1.9。
 # 5 诊断实验结果
@@ -168,23 +168,23 @@ $D$ 由 1 增至 2 使全部 18 个设置的 $p$ 下降，降幅 5.75–25.25 �
 本节在两类不可同时满足的约束设置中考察模型如何分配失败：一类令规定长度与逐边合法性冲突，另一类将规定长度替换为到达候选答案的任务目标。
 ### 6.2.1 规定长度与逐边合法性
 
-固定终止前缀的 $2\times2\times2$ 设计见附录 B.3。当规定长度与逐边合法性无法同时满足且不提供退出动作时，三个模型都主要尝试补足规定的输出项数。按逐边结构核验，DeepSeek、GPT 与 Qwen 分别有 400/400、393/400 和 397/400 个响应包含不属于输入图的相邻转移；DeepSeek 与 Qwen 通常生成图外节点，GPT 则大量使用空字符串维持规定的输出项数。当关闭长度要求且未额外声明逐边合法性时，三者分别有 397/400、400/400 和 400/400 个响应保留前缀并停止，说明冲突条件下的继续产出与长度要求有关。
+固定终止前缀的 $2\times2\times2$ 设计见附录 B.3。当规定长度与逐边合法性均被要求且不提供退出动作时，DeepSeek、GPT 与 Qwen 分别有 400/400、394/400 和 400/400 个输出路径列表达到规定项数，但实现方式不同：DeepSeek 与 Qwen 分别有 400/400 和 397/400 个响应包含可核验的图外转移；GPT 中该比例为 71/400（17.75%），另有 322/400（80.50%）使用空字符串占位，不能将后者计为图外转移。完整核验及缺失记录见附录 D.3.2。当关闭长度要求且未额外声明逐边合法性时，三者分别有 397/400、400/400 和 400/400 个响应保留前缀并停止。
 
 进一步强调逐边合法性并未改变 DeepSeek 与 Qwen 的处置。开启合法性声明相对于关闭该声明，两者的非法续写率变化分别为 0.00 [0.00, 0.00] 和 0.00 [−1.25, 1.25] 个百分点。提供显式退出动作后，DeepSeek 的非法续写率由 100.00% 降至 0.00%，变化为 −100.00 [−100.00, −100.00] 个百分点；Qwen 由 99.00% 降至 7.00%，变化为 −92.00 [−94.75, −89.00] 个百分点。
 
-退出动作进一步改变了失败形式：DeepSeek 中 87.75% 使用显式退出 (R)、12.25% 提前停止 (S)；Qwen 中 92.25% 转为 (S)，另有 7.00% 的 (I) 和 0.75% 的 (O)。GPT 无退出时则主要以空字符串维持输出项数，因此多数结构违规在 (R/S/I/O) 分类中归入 (O)；提供退出后，26.25% 为 (R)、60.25% 为 (S)、5.25% 为 (I)、8.25% 为 (O)。
+退出动作进一步改变了失败形式：DeepSeek 中 87.75% 使用显式退出 (R)、12.25% 提前停止 (S)；Qwen 中 92.25% 转为 (S)，另有 7.00% 的 (I) 和 0.75% 的 (O)。GPT 无退出时主要使用空字符串占位，这类格式违规在 (R/S/I/O) 分类中归入 (O)；提供退出后，26.25% 为 (R)、60.25% 为 (S)、5.25% 为 (I)、8.25% 为 (O)。
 
-因此，在未提供退出动作时，三个模型都主要维持规定的输出长度形式，而未能保持逐边合法性。对 DeepSeek 与 Qwen，重复强调逐边合法性未改变这一取舍；提供显式退出动作则明显改变了响应分布，但三个模型使用退出动作的方式不同。
+因此，在未提供退出动作时，三个模型都主要维持规定的输出项数，但未能给出满足图结构要求的有效路径：DeepSeek 与 Qwen 主要生成图外转移，GPT 则主要使用空字符串占位。对 DeepSeek 与 Qwen，重复强调逐边合法性未改变这一取舍；提供显式退出动作则明显改变了响应分布，但三个模型使用退出动作的方式不同。
 ### 6.2.2 候选答案与逐边合法性
 
 为检验上述取舍是否局限于规定长度，本文进一步反向一条中段黄金边，使给定候选答案由存在合法支持路径变为不可达；模型仍被要求生成逐边合法且最终到达该候选答案的支持路径。该实验未提供显式退出动作，具体构造见附录 B.4。
 
-完整证据条件下，DeepSeek、GPT 与 Qwen 分别有 399/400、392/400 和 392/400 个响应同时到达候选答案并保持逐边合法。在这些完整证据条件下成功的配对实例中，支持边被移除后，三者分别有 349/399、316/392 和 392/392 个响应的路径到达候选答案但违反逐边合法性；路径保持逐边合法但未到达候选答案的响应分别为 50/399、68/392 和 0/392。GPT 其余 8 例未落入上述两种取舍。
+完整证据条件下，DeepSeek、GPT 与 Qwen 分别有 399/400、392/400 和 392/400 个响应的路径到达候选答案且通过结构合法性检验。在这些完整证据条件下成功的配对实例中，支持边被移除后，三者分别有 349/399、316/392 和 392/392 个响应的路径到达候选答案但未通过结构合法性检验；路径通过结构合法性检验但未到达候选答案的响应分别为 50/399、68/392 和 0/392。GPT 其余 8 例未落入上述两种取舍。
 
-DeepSeek、GPT 与 Qwen 的 $\theta$ 分别为 74.94 [67.92, 81.00]、63.27 [54.96, 70.69] 和 100.00 [100.00, 100.00] 个百分点。以全部 400 个预定配对实例进行敏感性分析，结论方向不变。因此，在这一合成图且未提供退出动作的输出契约下，三个未启用推理模式的模型配置都更常维持候选答案，而牺牲逐边合法性。
+DeepSeek、GPT 与 Qwen 的 $\theta$ 分别为 74.94 [67.92, 81.00]、63.27 [54.96, 70.69] 和 100.00 [100.00, 100.00] 个百分点。以全部 400 个预定配对实例进行敏感性分析，结论方向不变。因此，在这一合成图且未提供退出动作的输出契约下，三个主要模型配置都更常维持候选答案，而牺牲逐边合法性。
 ### 6.2.3 合成冲突设置的共同模式与解释边界
 
-在未提供退出动作时，两类合成冲突在三个未启用推理模式的模型配置上呈现相同方向：规定长度与逐边合法性冲突时，模型主要维持输出长度形式；候选答案与逐边合法性冲突时，模型主要维持候选答案。两者共同表明，在本文合成图及其输出契约中，当任务目标与当前输入图中的逐边合法性无法同时满足时，这三个模型配置更常维持任务目标而牺牲逐边合法性。
+在未提供退出动作时，两类合成冲突在三个主要模型配置上呈现相同方向：规定长度与逐边合法性冲突时，模型主要维持输出长度形式；候选答案与逐边合法性冲突时，模型主要维持候选答案。两者共同表明，在本文合成图及其输出契约中，当任务目标与当前输入图中的逐边合法性无法同时满足时，这三个模型配置更常维持任务目标的输出形式，而未能同时给出满足图结构要求的有效路径；其中 GPT 在长度冲突下主要使用空字符串占位，不能将其与图外转移视为同一种违规。
 
 一种可能的解释是，约束核验成本影响了模型的取舍。两项实验中，被维持的目标均可由输出及简单任务参数直接核验，而逐边合法性需要参照输入图。不过，被维持的一侧同时具有任务目标属性，当前设计未独立操纵任务目标属性与核验方式，也未直接测量模型内部的核验过程，因此不能将这一共同模式单独归因于核验成本。未来可通过独立操纵这两个因素，检验这一假说。
 
@@ -205,16 +205,16 @@ DeepSeek 的响应进一步说明，路径合法不等于答案与路径一致�
 
 本文提出 Graph-Intervention Faithfulness（GIF），通过反事实图、序列化控制与逐边符号验证，区分答案或路径的表面一致性与响应对当前输入图结构的实际遵循。实验表明，答案随反事实图变化或生成路径与答案一致，均不足以单独证明响应满足输入图的结构约束；不同输出契约下获得的诊断结果也不能被视为同一潜在状态的可互换读数。
 
-诊断与受控实验进一步揭示了两类结构失败。第一，长路径失败集中暴露于最后一次同源竞争选择；该位置同时表现出任务边界差距、对候选下游结构的敏感性，以及严格配对识别出的局部同源竞争效应。第二，在合成图中，三个未启用推理模式的模型配置在两类任务目标—合法性冲突中都更常维持规定长度或给定候选答案；MQuAKE 与 KQA Pro 派生实验均观察到关键证据移除后的图外转移增长，但 KQA Pro 中 DeepSeek 的相对取舍方向尚不明确。显式退出动作能够改变失败行为的分布，但其使用方式和效果同样具有模型差异。
+诊断与受控实验进一步揭示了两类结构失败。第一，长路径失败集中暴露于最后一次同源竞争选择；该位置同时表现出任务边界差距、对候选下游结构的敏感性，以及严格配对识别出的局部同源竞争效应。第二，在合成图中，三个主要模型配置在两类任务目标—合法性冲突中都更常维持输出长度形式或给定候选答案；MQuAKE 与 KQA Pro 派生实验均观察到关键证据移除后的图外转移增长，但 KQA Pro 中 DeepSeek 的相对取舍方向尚不明确。显式退出动作能够改变失败行为的分布，但其使用方式和效果同样具有模型差异。
 
 这些结果不构成一般性的约束优先级，也不解释模型内部如何形成上述取舍。跨设置更稳定的观察是，关键证据移除会增加图外生成风险，而具体失败分配具有异质性。图推理中的结构忠实性因此必须独立于表面任务完成度进行检验。可靠的图推理评测不仅应检查答案与生成路径是否自洽，还应固定输出契约并逐边验证生成路径；当任务目标可能与当前图结构冲突时，还应显式定义可识别的退出响应，并分别评估非法续写、正确退出与错误退出。
 # Limitations
 
 第一，在要求恰好 $k$ 跳且路径唯一的图族中，最后一次竞争位置必然同时是黄金后继下游支持发生突变的位置；二者在该约束下不可分离。本文将该发现表述为该结构边界上的稳定脆弱性，不主张位置本身的独立效应。
 
-第二，本文的主要统计推断仅覆盖三个未启用推理模式的模型配置。在一项 40 例的小样本补充实验中，另一个启用推理的配置在候选答案不可达且未提供退出动作时，有 39/40 个响应自行拒绝继续支持给定答案，仅 1/40 生成图外转移，方向与三个主要配置明显不同。由于该比较同时改变了模型检查点与推理模式，且样本量有限，本文不将这一差异归因于推理模式；其来源仍需在同一模型检查点下进行严格配对检验。
+第二，本文的主要统计推断仅覆盖三个主要模型配置。在一项 40 例的小样本补充实验中，另一个启用推理的配置在候选答案不可达且未提供退出动作时，有 39/40 个响应自行拒绝继续支持给定答案，仅 1/40 生成图外转移，方向与三个主要配置明显不同。由于该比较同时改变了模型检查点与推理模式，且样本量有限，本文不将这一差异归因于推理模式；其来源仍需在同一模型检查点下进行严格配对检验。
 
-第三，本文在两类合成约束冲突中均观察到三个未启用推理模式的模型配置更常维持任务目标，而牺牲逐边合法性。但在当前设计中，规定长度与给定候选答案既是任务目标，也能够由输出及简单任务参数直接核验；相比之下，逐边合法性需要回查当前输入图。MQuAKE 的迁移结果支持同向的候选保持模式，而 KQA Pro 中 DeepSeek 的相对取舍尚不明确。
+第三，本文在两类合成约束冲突中均观察到三个主要模型配置更常维持任务目标的输出形式，但未能同时给出满足图结构要求的有效路径。但在当前设计中，规定长度与给定候选答案既是任务目标，也能够由输出及简单任务参数直接核验；相比之下，逐边合法性需要回查当前输入图。MQuAKE 的迁移结果支持同向的候选保持模式，而 KQA Pro 中 DeepSeek 的相对取舍尚不明确。
 
 当前设计未独立操纵任务目标属性与约束核验方式，也未直接测量模型的核验成本，因此无法区分这两类因素对行为取舍的作用，不能据此确认核验成本假说或推断一般性的约束优先级。未来工作可通过独立操纵任务目标属性与核验方式，并结合明确的成本测量，进一步检验该假说。
 # Appendix A 图生成细节
@@ -296,6 +296,7 @@ last_decoy 在基础图上额外加入一条诱饵边，因此链式图和分叉
 | GPT 历史配置 | gpt-5.4-mini | Anyaigc | 不传入 thinking 或 reasoning_effort 参数 |
 | Qwen 历史及新四跳配置 | qwen-max | 阿里云百炼（DashScope） | enable_thinking = false |
 | GPT 新四跳配置 | gpt-5.4-mini-2026-03-17 | Anyaigc | 不传入 thinking 或 reasoning_effort 参数 |
+| DeepSeek 推理补充配置（D.4.5） | deepseek-v4-pro | DeepSeek | thinking.type = enabled |
 
 对应的 Chat Completions 接口分别为 https://api.deepseek.com/v1/chat/completions、https://anyaigc.com/v1/chat/completions 和 https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions。GPT 经第三方接口调用，不表述为直接使用 OpenAI 官方接口。表中的推理设置指请求参数；尤其 GPT 未传入推理控制参数，不等于已验证服务端完全不执行内部推理。另行启用推理模式的补充观察与上述主配置分开报告。
 
@@ -425,7 +426,7 @@ O-full 从 $v_{k-2}$ 出发并采用延展终端窗口，要求模型完成 $v_{
 
 四个条件在 $v_{k-2}$ 处具有相同的局部候选结构。黄金后继、两个零出度终止候选、候选数量及相关边的序列化位置均保持一致。实验通过调整与任务起点不连通的干扰边数量，使四个条件的边列表长度相同，并以符号程序验证各条件的黄金任务路径唯一。
 
-实验使用 200 个反事实图对，并将每个图对中的两张图展开为 400 个基础图实例。四个任务条件在同一基础实例内配对。
+实验使用 400 个基础 sample_id 各自的 $G_1$，共 400 个单图实例，不展开 $G_2$。每个实例采用 decoy_last、endpoint_first、endpoint_last 和 endpoint_middle 四种呈现版本，每个任务条件预定 1,600 次调用；四个任务条件在同一实例与呈现版本内配对。
 ### B.1.3 通过末次竞争位置的判定
 
 实验一沿用 §3.3 定义的联合成功率 $p$、抵达率 $q_{\mathrm{reach}}$ 和条件局部正确率 $p_{\mathrm{cond}}$。在 F-task 与 R-task 中，只有模型生成的路径前缀与黄金路径 $v_0,\ldots,v_{k-2}$ 完全一致，并在下一跳选择黄金后继 $v^*_{k-1}$ 时，才记为联合成功；因此 $p$ 同时包含未能抵达和抵达后选择错误两类失败。
@@ -514,7 +515,7 @@ $\mathsf R$：在提供退出动作的条件下，模型按规定格式提交 NO
 
 $\mathsf S$：模型完整保留固定前缀，并在 $u^0$ 处停止，没有继续生成节点。
 
-$\mathsf I$：模型完整保留固定前缀，但在 $u^0$ 后继续生成至少一个节点。由于 $u^0$ 的出度为 0，该续写的第一条边必然是图外边。
+$\mathsf I$：响应满足规定的解析格式，完整保留固定前缀，未使用显式退出，并在 $u^0$ 后继续生成至少一个非空字符串节点。由于 $u^0$ 的出度为 0，该续写的第一条边必然是图外边。含空字符串、null 等异常路径项的响应归入 $\mathsf O$，不因列表变长直接判为 $\mathsf I$。
 
 $\mathsf O$：其他不合规响应，包括修改或遗漏固定前缀、起点错误、输出格式不兼容、在未提供退出动作时提交退出状态、输出无法解析以及未取得有效模型响应。
 ### B.3.4 主要对比与结果变量
@@ -526,7 +527,7 @@ $\mathsf O$：其他不合规响应，包括修改或遗漏固定前缀、起点
 长度要求关闭的条件用于描述没有补满路径压力时的基线响应。主要结果为四类终止状态的完整分布，并重点报告非法续写率 $p_{\mathsf I}=\Pr(Y_{\mathrm{term}}=\mathsf I)$。本文不把 $\mathsf S$ 与 $\mathsf R$ 合并为统一的“合规”指标：当长度要求开启时，$\mathsf S$ 仍违反规定长度；只有在退出动作被契约允许时，$\mathsf R$ 才是该契约下的合规响应。
 ### B.3.5 分母与缺失处理
 
-四类响应均以每个实验格预先分配的 400 次调用为固定分母，因此：$\Pr(\mathsf R)+\Pr(\mathsf S)+\Pr(\mathsf I)+\Pr(\mathsf O)=1$。请求失败、输出无法解析或未取得有效响应的调用不从分母中删除，而是归入 $\mathsf O$。本文同时报告每格的请求成功数、可解析响应数和四类响应计数，用于说明 $\mathsf O$ 的构成。
+四类响应均以每个实验格预先分配的 400 次调用为固定分母，因此：$\Pr(\mathsf R)+\Pr(\mathsf S)+\Pr(\mathsf I)+\Pr(\mathsf O)=1$。请求失败、输出无法解析或未取得有效响应的调用不从分母中删除，而是归入 $\mathsf O$。各条件的固定分母响应分布见 D.3.1；核心冲突条件的异常路径项及缺失记录另见 D.3.2。
 
 另外报告在“输出可解析且保留固定前缀”条件下计算的非法续写率，作为响应形态的敏感性分析。由于实验因素本身可能改变解析率，该条件比例不作为跨条件比较的主要口径。
 ## B.4 候选答案与逐边合法性冲突实验
@@ -551,16 +552,16 @@ $G^{(j)}=\mathbb{1}[\hat{p}^{(j)}\text{ 从规定起点出发，且所有相邻�
 
 - 两者兼得：$T=1,G=1$；
 - 仅维持候选答案：$T=1,G=0$；
-- 仅保持逐边合法：$T=0,G=1$；
+- 仅保持路径结构合法：$T=0,G=1$；
 - 两者均未满足：$T=0,G=0$。
 
 未输出可核验路径的响应另记为“无路径”，不并入上述四格。响应是否维持候选答案依据生成路径的末节点判定，而不只依据 `answer` 字段。JSON 解析失败、空路径、空字符串节点及契约外状态另以响应形态变量记录，不替代结构分类。
 
-令 $E^{(j)}=1$ 表示模型在配对的完整证据条件下同时到达候选答案并保持逐边合法。主要结果量定义为：
+令 $E^{(j)}=1$ 表示模型在配对的完整证据条件下同时满足 $T=1,G=1$。主要结果量定义为：
 
 $\theta=\Pr(T=1,G=0\mid E=1)-\Pr(T=0,G=1\mid E=1)$
 
-$\theta>0$ 表示支持边被移除后，模型更常维持候选答案；$\theta<0$ 表示模型更常保持逐边合法性。
+$\theta>0$ 表示“路径到达候选但结构检验失败”更常见；$\theta<0$ 表示“路径通过结构检验但未到达候选”更常见。由于 $G$ 同时检查起点与逐边合法性，$G=0$ 不必然意味着出现图外转移。
 
 ### B.4.3 分母与统计推断
 
@@ -572,7 +573,7 @@ $\theta>0$ 表示支持边被移除后，模型更常维持候选答案；$\thet
 本节说明 MQuAKE 与 KQA Pro KB 派生实例的构造。两者均使用具有真实实体与关系来源的受控图，但不等同于在原始问答基准上评估准确率。每个实例固定起点和候选答案，构造完整证据、缺失证据与安慰剂三个条件；结构核验只依据当前展示的图，不将未展示的知识库事实或模型参数知识计为支持证据。本节 KQA Pro 设置对应新构造的 200 例四跳任务，不与旧两跳预实验混用。
 ### B.5.1 MQuAKE 派生实例
 
-数据取自 MQuAKE-CF 的 orig.triples，使用原始事实链而非编辑后的反事实。将其中 1,804 条四跳记录按 case_id 的稳定哈希排序，依次检查四条边是否首尾连接、五个路径实体是否互异，以及前三个路径节点是否各具有两个合格的非支持后继。共检查 205 条记录，保留前 200 条合格实例。筛选不使用模型响应。
+数据取自 MQuAKE-CF [22] 的 orig.triples，使用原始事实链而非编辑后的反事实。将其中 1,804 条四跳记录按 case_id 的稳定哈希排序，依次检查四条边是否首尾连接、五个路径实体是否互异，以及前三个路径节点是否各具有两个合格的非支持后继。共检查 205 条记录，保留前 200 条合格实例。筛选不使用模型响应。
 
 完整图包含四条支持边、六条分支边和八条不连通干扰边，共 18 条边。分支边取自缓存的 Wikidata 实体关系记录，排除 deprecated 声明；其目标不属于支持路径，且六个分支目标互异，在展示图中均无后继。八条干扰边取自其他 MQuAKE 原始事实链，与支持路径及分支节点不相交，干扰边之间也不共享节点。候选边选择和展示顺序由实例标识的稳定哈希确定。
 
@@ -600,7 +601,7 @@ Return exactly one JSON object:
 数据版本以原始文件及 Wikidata 缓存的 SHA-256 固定；逐边来源记录保留 MQuAKE 的 case_id 和三元组索引，或 Wikidata 的声明 ID、实体修订号与缓存获取时间。MQuAKE-CF 原始文件 SHA-256 为 fbf1ab9e5243e52da429f7636990096ae0b5f8fbf60f1d4d3a4bf0c9214cd6ea；冻结矩阵包含 600 条任务，矩阵 SHA-256 为 53349fa3a488dc97335f4dcf054494fc991c343fd7423ee4b6dcc4b433dc47d4。原始数据地址与缓存校验和保存在配套来源清单中。
 ### B.5.2 KQA Pro KB 派生实例
 
-数据取自 KQA Pro 的 kb.json，仅使用实体至实体的关系记录，不沿用原始问题、程序或旧两跳实例。所用文件来自社区镜像 drt/kqa_pro，修订号为 37d63be7ca3f03dcc657ba89c72b566ab9dfaa9f，KB 文件 SHA-256 为 04da7408320c5cb7023c44372cce32846d56d369d8865d2e61a18c3956661a7c。
+数据取自 KQA Pro [23] 的 kb.json，仅使用实体至实体的关系记录，不沿用原始问题、程序或旧两跳实例。所用文件来自社区镜像 drt/kqa_pro，修订号为 37d63be7ca3f03dcc657ba89c72b566ab9dfaa9f，KB 文件 SHA-256 为 04da7408320c5cb7023c44372cce32846d56d369d8865d2e61a18c3956661a7c。
 
 构造使用固定随机种子 20260908：对排序后的候选起点打乱顺序，每个起点最多尝试 30 次四步采样，要求路径包含五个不同实体，每个起点至多保留一个实例。筛选与模型输出无关，达到 200 个合格实例后停止。每张图内实体显示名经 Unicode NFKC、空白和大小写规范化后必须唯一，以避免名称映射歧义。
 
@@ -894,7 +895,7 @@ $\mathrm{PathValid}$ 同时要求起点正确、路径长度满足规定跳数�
 | Qwen | O-full | 1600 | 99.50% | 100.00% | 99.50% | 1600 |
 ### D.1.2 主要任务边界对比与缺失敏感性
 
-主要估计使用 $O\text{-local}$ 与 $F$ 均有结果的任务对；敏感性分析将任一条件缺失的结果记为未通过，并恢复预定的 1600 次调用。置信区间以 200 个基础 sample_id 为聚类单位，采用 2000 次 cluster bootstrap。
+主要估计使用 $O\text{-local}$ 与 $F$ 均有结果的任务对；敏感性分析将任一条件缺失的结果记为未通过，并恢复预定的 1,600 次调用。置信区间以基础 sample_id 为聚类单位，采用 2,000 次 cluster bootstrap；预定共 400 个聚类，完整配对分析中 DeepSeek 与 Qwen 各纳入 400 个，GPT 纳入 399 个。
 
 | 模型 | 分析口径 | $O\text{-local}-F$ | 95% CI | 配对任务数 |
 |---|---|---:|---|---:|
@@ -907,11 +908,13 @@ $\mathrm{PathValid}$ 同时要求起点正确、路径长度满足规定跳数�
 
 ### D.1.3 终端窗口维度的描述性差值
 
+各对比保留对应条件均有结果的任务，先在每个 sample_id 内对可用呈现版本的配对差值取均值，再对 sample_id 等权平均；差分之差仅保留四条件齐全的任务。该口径不同于 D.1.1 的各条件可用响应均值，也不同于 D.1.2 对全部完整任务对汇总的主要估计，因此不能直接用表中展示的条件成功率相减复算。下表括号内为配对任务数，差值按未舍入值保留两位小数。
+
 | 模型 | $O\text{-full}-R$ | $R-F$ | $O\text{-full}-O\text{-local}$ | 差分之差 |
 |---|---:|---:|---:|---:|
-| DeepSeek | +27.00 pp | +2.69 pp | −0.88 pp | +3.19 pp |
-| GPT | +66.58 pp | +5.39 pp | +40.40 pp | −34.59 pp |
-| Qwen | +62.19 pp | +0.56 pp | +37.62 pp | −37.06 pp |
+| DeepSeek | +27.00 pp（1478） | +2.69 pp（1532） | −0.88 pp（1493） | +3.19 pp（1434） |
+| GPT | +66.58 pp（1462） | +5.39 pp（1512） | +40.40 pp（1472） | −34.59 pp（1393） |
+| Qwen | +62.19 pp（1600） | +0.56 pp（1600） | +37.63 pp（1600） | −37.06 pp（1600） |
 ## D.2 局部候选竞争
 ### D.2.1 D=1 与 D=2 的配对对比
 | 模型 | $k$ | 契约 | $p_{D=1}$ | $p_{D=2}$ | $\Delta p$ | 95% CI | $q_{\mathrm{reach}}^{D=1}$ | $q_{\mathrm{reach}}^{D=2}$ | $p_{\mathrm{cond}}^{D=1}$ | $p_{\mathrm{cond}}^{D=2}$ | $n$ |
@@ -1009,13 +1012,17 @@ $\mathrm{PathValid}$ 同时要求起点正确、路径长度满足规定跳数�
 | Qwen | 开 | 开 | 不提供 | 0.00% | 0.00% | 99.00% | 1.00% |
 ### D.3.2 冲突条件下的结构核验
 
-$O$ 仅表示以非空节点形式继续生成图外边，空字符串占位等响应被归入 $O$。因此，$I$ 不是全部结构非法响应的比例。本文另定义 $EdgeIllegal=1$，表示生成路径中至少存在一对相邻项不属于输入图边集。下表报告长度与合法性均开启、且不提供退出动作时的逐边核验结果，分母固定为 400。
+$I$ 表示在可解析且保留给定前缀的响应中，不使用显式退出而继续生成图外边的行为；空字符串占位等格式违规归入 $O$，不据此认定存在图外转移。响应分类与逐边审计分别进行：$EdgeIllegal=1$ 要求原始路径列表中至少有一对相邻项均为非空字符串，且对应有向边不属于当前输入图边集。涉及空字符串、null 或非字符串项的相邻对不判为图外边，但这些异常项仍使路径格式不合规；审计保留其他位置可判定的相邻对，不删除异常项后拼接新边。缺失记录或无法解析的路径不视为合法路径。
 
-| 模型 | 含图外转移 | 比例 |
-| ---- | ---- | ---- |
-| DeepSeek | 400/400 | 100.00% |
-| GPT | 393/400 | 98.25% |
-| Qwen | 397/400 | 99.25% |
+下表报告长度与合法性均开启、且不提供退出动作时的核验结果，分母固定为 400 个预定任务；空字符串占位与可核验图外转移在本条件下没有重叠。
+
+| 模型 | 含可核验图外转移 | 含空字符串占位 | 缺失响应记录 |
+| ---- | ---- | ---- | ---- |
+| DeepSeek | 400/400（100.00%） | 0/400（0.00%） | 0/400 |
+| GPT | 71/400（17.75%） | 322/400（80.50%） | 1/400 |
+| Qwen | 397/400（99.25%） | 0/400（0.00%） | 0/400 |
+
+GPT 的 393 例由 71 例含图外转移与 322 例空字符串占位构成，不能全部解释为图外生成。其余 6 条已保存响应均无上述两类现象，但不意味着满足完整输出契约；另有 1 个预定任务缺少响应记录。按原始列表项数检查，DeepSeek、GPT 与 Qwen 分别有 400、394 和 400 条响应达到规定项数，列表项数合规不等于生成了有效的规定跳数路径。上述补充审计不改变 D.3.1 的固定分母及 $R/S/I/O$ 分类。
 ### D.3.3 核心配对效应
 
 下表只报告贡献三使用的两个预先对比；区间以基础 sample_id 为聚类单位，采用 2000 次配对 cluster bootstrap。
@@ -1032,33 +1039,33 @@ $O$ 仅表示以非空节点形式继续生成图外边，空字符串占位等�
 
 每个模型、证据条件均以 400 个预定图实例为分母。完整证据条件下的结果如下。
 
-| 模型 | 两者兼得 | 仅维持候选答案 | 仅保持逐边合法 | 两者均失 | 无路径 |
+| 模型 | 两者兼得 | 仅维持候选答案 | 仅保持路径结构合法 | 两者均失 | 无路径 |
 | ---- | ---- | ---- | ---- | ---- | ---- |
 | DeepSeek | 99.75% | 0.25% | 0.00% | 0.00% | 0.00% |
 | GPT | 98.00% | 1.75% | 0.00% | 0.25% | 0.00% |
 | Qwen | 98.00% | 1.50% | 0.50% | 0.00% | 0.00% |
 
-缺失证据条件下，候选答案在当前输入图中不可达，因而不存在同时到达候选答案且逐边合法的响应。
+缺失证据条件下，候选答案从规定起点不可达，因而不存在同时到达候选答案且通过结构合法性检验的响应。
 
-| 模型 | 两者兼得 | 仅维持候选答案 | 仅保持逐边合法 | 两者均失 | 无路径 |
+| 模型 | 两者兼得 | 仅维持候选答案 | 仅保持路径结构合法 | 两者均失 | 无路径 |
 | ---- | ---- | ---- | ---- | ---- | ---- |
 | DeepSeek | 0.00% | 87.50% | 12.50% | 0.00% | 0.00% |
 | GPT | 0.00% | 80.50% | 17.25% | 1.00% | 1.25% |
 | Qwen | 0.00% | 100.00% | 0.00% | 0.00% | 0.00% |
 
-缺失证据条件下“两者兼得”均为 0，符合离线构造核验结果。三个模型均更常继续到达候选答案并产生图外转移，而不是生成逐边合法但未到达候选答案的路径。
+缺失证据条件下“两者兼得”均为 0，符合离线构造核验结果。三个模型均更常生成到达候选答案但未通过结构合法性检验的路径，而不是结构合法但未到达候选答案的路径。
 
 ### D.4.2 条件配对主分析
 
 完整证据条件下，DeepSeek、GPT 与 Qwen 分别有 399/400、392/400 和 392/400 个响应同时到达候选答案并保持逐边合法。主要分析限定于这些成功实例及其配对的缺失证据响应。
 
-| 模型 | 有效 $N$ | 仅维持候选答案 | 仅保持逐边合法 | 两者均失 | 无路径 | $\theta$（pp） | 95% CI（pp） |
+| 模型 | 有效 $N$ | 仅维持候选答案 | 仅保持路径结构合法 | 两者均失 | 无路径 | $\theta$（pp） | 95% CI（pp） |
 | ---- | ---- | ---- | ---- | ---- | ---- | ---- | ---- |
 | DeepSeek | 399 | 349/399 | 50/399 | 0/399 | 0/399 | 74.94 | [67.92, 81.00] |
 | GPT | 392 | 316/392 | 68/392 | 3/392 | 5/392 | 63.27 | [54.96, 70.69] |
 | Qwen | 392 | 392/392 | 0/392 | 0/392 | 0/392 | 100.00 | [100.00, 100.00] |
 
-三个模型的 $\theta$ 均为正，表明在未提供退出动作的输出契约下，支持边被移除后，模型更常维持候选答案而违反逐边合法性。
+三个模型的 $\theta$ 均为正，表明在未提供退出动作的输出契约下，支持边被移除后，“路径到达候选但结构检验失败”比“路径结构合法但未到达候选”更常见。
 
 ### D.4.3 固定分母敏感性分析
 
@@ -1086,7 +1093,7 @@ $O$ 仅表示以非空节点形式继续生成图外边，空字符串占位等�
 
 ### D.4.5 推理模式配置的补充观察
 
-另一个补充的推理模式配置在相同的 40 个完整证据与缺失证据实例上运行，且不提供退出动作。完整证据条件下，40/40 个响应均生成合法支持路径；缺失证据条件下，39/40 个响应自行提交契约未定义的拒绝状态且未生成路径，仅 1/40 继续到达候选答案并产生图外转移。相应的 $\theta$ 为 2.50 个百分点，95% CI 为 [0.00, 7.50]。
+补充配置为 DeepSeek-V4-Pro，通过 DeepSeek 官方接口请求 deepseek-v4-pro，设置 thinking.type = enabled、temperature = 0。该配置在相同的 40 个完整证据与缺失证据实例上运行，共保存 80 条成功响应，且不提供退出动作；原始记录未保存逐次调用时间，因此不据文件修改时间推断精确运行日期。完整证据条件下，40/40 个响应均生成合法支持路径；缺失证据条件下，39/40 个响应自行提交契约未定义的拒绝状态且未生成路径，仅 1/40 继续到达候选答案并产生图外转移。相应的 $\theta$ 为 2.50 个百分点，95% CI 为 [0.00, 7.50]。
 
 该结果的方向不同于三个主要模型配置，但比较同时改变了模型配置与推理模式，因此不能将差异单独归因于推理模式。本结果仅作为外部有效性边界，不纳入主要统计推断。
 ## D.5 MQuAKE 的补充行为评分
@@ -1169,23 +1176,48 @@ $\theta$ 的主分析限定于完整证据下到达候选且路径合法的实�
 
 # 参考文献
 
-[1] Follow the Path: Reasoning over Knowledge Graph Paths to Improve Large Language Model Factuality
-[2] Search-on-Graph: Iterative Informed Navigation for Large Language Model Reasoning on Knowledge Graphs
-[3] GraphWalk: Enabling Reasoning in Large Language Models through Tool-Based Graph Navigation
-[4] Towards Faithfully Interpretable NLP Systems: How Should We Define and Evaluate Faithfulness?
-[5] Lost in Serialization: Invariance and Generalization of LLM Graph Reasoners
-[6] Can Graph Descriptive Order Affect Solving Graph Problems?
-[7] Faithful Knowledge Graph Explanations in Commonsense Question Answering
-[8] Reasoning on Graphs: Faithful and Interpretable Large Language Model Reasoning
-[9] On Measuring Faithfulness or Self-consistency of Natural Language Explanations
-[10] Language Models Don’t Always Say What They Think: Unfaithful Explanations in Chain-of-Thought Prompting
-[11] Breaking the Chain: A Causal Analysis of LLM Faithfulness to Intermediate Structures
-[12] RAGAS: Automated Evaluation of Retrieval Augmented Generation
-[13] FiDeLiS: Faithful Reasoning in Large Language Model for Knowledge Graph Question Answering
-[14] G-Retriever: Retrieval-Augmented Generation for Textual Graph Understanding and Question Answering
-[15] Revisiting the Graph Reasoning Ability of Large Language Models: Case Studies in Translation, Connectivity and Shortest Path
-[16] Quantifying Language Models' Sensitivity to Spurious Features in Prompt Design or: How I Learned to Start Worrying About Prompt Formatting
-[17] Let Me Speak Freely? A Study on the Impact of Format Restrictions on Large Language Model Performance
-[18] Instruction-Following Evaluation for Large Language Models
-[19] Benchmarking Complex Instruction-Following with Multiple Constraints Composition
-[20] Control Illusion: The Failure of Instruction Hierarchies in Large Language Models
+[1] Mike Zhang, Johannes Bjerva, and Russa Biswas. 2026. [Follow the Path: Reasoning over Knowledge Graph Paths to Improve Large Language Model Factuality](https://aclanthology.org/2026.findings-acl.561/). In Findings of the Association for Computational Linguistics: ACL 2026, pages 11574–11590.
+
+[2] Jia Ao Sun, Hao Yu, Fabrizio Gotti, Fengran Mo, Yihong Wu, Yuchen Hui, Zhan Su, Lingfeng Xiao, and Jian-Yun Nie. 2025. [Search-on-Graph: Iterative Informed Navigation for Large Language Model Reasoning on Knowledge Graphs](https://arxiv.org/abs/2510.08825). arXiv preprint arXiv:2510.08825.
+
+[3] Taraneh Ghandi, Hamidreza Mahyar, and Shachar Klaiman. 2026. [GraphWalk: Enabling Reasoning in Large Language Models through Tool-Based Graph Navigation](https://arxiv.org/abs/2604.01610). arXiv preprint arXiv:2604.01610.
+
+[4] Alon Jacovi and Yoav Goldberg. 2020. [Towards Faithfully Interpretable NLP Systems: How Should We Define and Evaluate Faithfulness?](https://aclanthology.org/2020.acl-main.386/). In Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics, pages 4198–4205.
+
+[5] Daniel Herbst, Lea Karbevska, Divyanshu Kumar, Akanksha Ahuja, Fatemeh Gholamzadeh Nasrabadi, and Fabrizio Frasca. 2025. [Lost in Serialization: Invariance and Generalization of LLM Graph Reasoners](https://arxiv.org/abs/2511.10234). arXiv preprint arXiv:2511.10234.
+
+[6] Yuyao Ge, Shenghua Liu, Baolong Bi, Yiwei Wang, Lingrui Mei, Wenjie Feng, Lizhe Chen, and Xueqi Cheng. 2025. [Can Graph Descriptive Order Affect Solving Graph Problems with LLMs?](https://aclanthology.org/2025.acl-long.321/). In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 6404–6420.
+
+[7] Guy Aglionby and Simone Teufel. 2022. [Faithful Knowledge Graph Explanations in Commonsense Question Answering](https://aclanthology.org/2022.emnlp-main.743/). In Proceedings of the 2022 Conference on Empirical Methods in Natural Language Processing, pages 10811–10817.
+
+[8] Linhao Luo, Yuan-Fang Li, Gholamreza Haffari, and Shirui Pan. 2024. [Reasoning on Graphs: Faithful and Interpretable Large Language Model Reasoning](https://arxiv.org/abs/2310.01061). In The Twelfth International Conference on Learning Representations.
+
+[9] Letitia Parcalabescu and Anette Frank. 2024. [On Measuring Faithfulness or Self-consistency of Natural Language Explanations](https://aclanthology.org/2024.acl-long.329/). In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 6048–6089.
+
+[10] Miles Turpin, Julian Michael, Ethan Perez, and Samuel R. Bowman. 2023. [Language Models Don't Always Say What They Think: Unfaithful Explanations in Chain-of-Thought Prompting](https://arxiv.org/abs/2305.04388). In Advances in Neural Information Processing Systems, volume 36.
+
+[11] Oleg Somov, Mikhail Chaichuk, Gleb Ershov, Karim Vafin, Mikhail Seleznyov, Alexander Panchenko, and Elena Tutubalina. 2026. [Breaking the Chain: A Causal Analysis of LLM Faithfulness to Intermediate Structures](https://arxiv.org/abs/2603.16475). arXiv preprint arXiv:2603.16475.
+
+[12] Shahul Es, Jithin James, Luis Espinosa Anke, and Steven Schockaert. 2024. [RAGAs: Automated Evaluation of Retrieval Augmented Generation](https://aclanthology.org/2024.eacl-demo.16/). In Proceedings of the 18th Conference of the European Chapter of the Association for Computational Linguistics: System Demonstrations, pages 150–158.
+
+[13] Yuan Sui, Yufei He, Nian Liu, Xiaoxin He, Kun Wang, and Bryan Hooi. 2025. [FiDeLiS: Faithful Reasoning in Large Language Models for Knowledge Graph Question Answering](https://aclanthology.org/2025.findings-acl.436/). In Findings of the Association for Computational Linguistics: ACL 2025, pages 8315–8330.
+
+[14] Xiaoxin He, Yijun Tian, Yifei Sun, Nitesh V. Chawla, Thomas Laurent, Yann LeCun, Xavier Bresson, and Bryan Hooi. 2024. [G-Retriever: Retrieval-Augmented Generation for Textual Graph Understanding and Question Answering](https://proceedings.neurips.cc/paper_files/paper/2024/hash/efaf1c9726648c8ba363a5c927440529-Abstract-Conference.html). In Advances in Neural Information Processing Systems, volume 37, pages 132876–132907.
+
+[15] Xinnan Dai, Qihao Wen, Yifei Shen, Hongzhi Wen, Dongsheng Li, Jiliang Tang, and Caihua Shan. 2024. [Revisiting the Graph Reasoning Ability of Large Language Models: Case Studies in Translation, Connectivity and Shortest Path](https://arxiv.org/abs/2408.09529). arXiv preprint arXiv:2408.09529.
+
+[16] Melanie Sclar, Yejin Choi, Yulia Tsvetkov, and Alane Suhr. 2024. [Quantifying Language Models' Sensitivity to Spurious Features in Prompt Design or: How I learned to start worrying about prompt formatting](https://arxiv.org/abs/2310.11324). In The Twelfth International Conference on Learning Representations.
+
+[17] Zhi Rui Tam, Cheng-Kuang Wu, Yi-Lin Tsai, Chieh-Yen Lin, Hung-yi Lee, and Yun-Nung Chen. 2024. [Let Me Speak Freely? A Study On The Impact Of Format Restrictions On Large Language Model Performance](https://aclanthology.org/2024.emnlp-industry.91/). In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing: Industry Track, pages 1218–1236.
+
+[18] Jeffrey Zhou, Tianjian Lu, Swaroop Mishra, Siddhartha Brahma, Sujoy Basu, Yi Luan, Denny Zhou, and Le Hou. 2023. [Instruction-Following Evaluation for Large Language Models](https://arxiv.org/abs/2311.07911). arXiv preprint arXiv:2311.07911.
+
+[19] Bosi Wen, Pei Ke, Xiaotao Gu, Lindong Wu, Hao Huang, Jinfeng Zhou, Wenchuang Li, Binxin Hu, Wendy Gao, Jiaxin Xu, Yiming Liu, Jie Tang, Hongning Wang, and Minlie Huang. 2024. [Benchmarking Complex Instruction-Following with Multiple Constraints Composition](https://papers.nips.cc/paper_files/paper/2024/hash/f8c24b08b96a08ec7a7a975feea7777e-Abstract-Datasets_and_Benchmarks_Track.html). In Advances in Neural Information Processing Systems, volume 37, pages 137610–137645.
+
+[20] Yilin Geng, Haonan Li, Honglin Mu, Xudong Han, Timothy Baldwin, Omri Abend, Eduard Hovy, and Lea Frermann. 2026. [Control Illusion: The Failure of Instruction Hierarchies in Large Language Models](https://ojs.aaai.org/index.php/AAAI/article/view/40339). In Proceedings of the AAAI Conference on Artificial Intelligence, 40(36):30816–30824.
+
+[21] Linhao Luo, Zicheng Zhao, Gholamreza Haffari, Yuan-Fang Li, Chen Gong, and Shirui Pan. 2025. [Graph-constrained Reasoning: Faithful Reasoning on Knowledge Graphs with Large Language Models](https://proceedings.mlr.press/v267/luo25t.html). In Proceedings of the 42nd International Conference on Machine Learning, volume 267 of Proceedings of Machine Learning Research, pages 41540–41565.
+
+[22] Zexuan Zhong, Zhengxuan Wu, Christopher D. Manning, Christopher Potts, and Danqi Chen. 2023. [MQuAKE: Assessing Knowledge Editing in Language Models via Multi-Hop Questions](https://aclanthology.org/2023.emnlp-main.971/). In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing, pages 15686–15702.
+
+[23] Shulin Cao, Jiaxin Shi, Liangming Pan, Lunyiu Nie, Yutong Xiang, Lei Hou, Juanzi Li, Bin He, and Hanwang Zhang. 2022. [KQA Pro: A Dataset with Explicit Compositional Programs for Complex Question Answering over Knowledge Base](https://aclanthology.org/2022.acl-long.422/). In Proceedings of the 60th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers), pages 6101–6119.
