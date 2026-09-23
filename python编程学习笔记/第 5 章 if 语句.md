@@ -1,7 +1,7 @@
 ```table-of-contents
 ```
 # 一、方法
-1. lower（）
+1. **lower（）**
 函数`lower()` 是把字符串里的英文字母全部转换成小写，函数 `lower()` 不会修改存储在变量 `car` 中的值。
 ```python
 car = 'Audi'
