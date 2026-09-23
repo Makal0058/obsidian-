@@ -66,64 +66,51 @@ prompt = prompt + "\nEnter 'quit' to end the program. "
 
 哨兵值是**专门用来告诉程序“该停了”的特殊值。**
 ```python
+prompt = "\nTell me something, and I will repeat it back to you:"
+prompt += "\nEnter 'quit' to end the program. "
+
+message = ""
 while message != 'quit':
+    message = input(prompt)
+
+    if message != 'quit':
+        print(message)
+
+Tell me something, and I will repeat it back to you:
+Enter 'quit' to end the program. Hello everyone!
+
+>>>Hello everyone!
+
+Tell me something, and I will repeat it back to you:
+Enter 'quit' to end the program. quit
 ```
-
-意思是：
-
-> 只要 `message` 还不等于 `'quit'`，就一直循环。
-
-每一轮：
-
+注：`!=` 判断是否**不等于**。
+## 2.4 break
+要**立即退出 while 循环**，不再运行循环中余下的代码，也不管条件测试的结果如何，可使用 break 语句。
+## 2.5 continue
+要返回到循环开头，并**根据条件测试结果决定是否继续执行循环**，可使用 `continue` 语句。
 ```python
-message = input(prompt)
+current_number = 0
+
+while current_number < 10:
+    current_number += 1
+
+    if current_number % 2 == 0:
+        continue
+
+    print(current_number)
+
+>>>1
+>>>3
+>>>5
+>>>7
+>>>9
 ```
 
-让用户输入内容，然后：
+注：
+- `continue`：跳过**本轮循环剩下的代码**，直接进入下一轮。  
+- `break`：直接结束**整个循环**。
 
-```python
-print(message)
-```
+如果程序陷入无限循环，可按 **Ctrl + C**，也可关闭显示程序输出的终端窗口
 
-把用户输入的内容再打印出来。
 
-比如你输入：
-
-```text
-hello
-```
-
-程序会打印：
-
-```text
-hello
-```
-
-然后继续问。
-
-直到你输入：
-
-```text
-quit
-```
-
-循环条件：
-
-```python
-message != 'quit'
-```
-
-就变成：
-
-```python
-False
-```
-
-下一轮就不再继续了。
-
-不过这段代码有一个小问题：**输入 `quit` 时，它还是会先打印一次 `quit`，然后才结束。**
-
-您现在笔记里可以记：
-
-> `+=`：在原变量基础上继续追加内容。  
-> `while 条件:`：只要条件为 `True`，就不断重复执行代码。
