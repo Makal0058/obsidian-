@@ -80,25 +80,99 @@ Gumbel-Softmax 会先给每个候选加一份随机噪声 $z_{t,k}=\frac{\exp((\
 这个意思是推理过程中**不一定全部都是连续 latent token**，可以类似 $\text{latent}\rightarrow\text{latent}\rightarrow\text{discrete token}\rightarrow\text{latent}\rightarrow\cdots$，或者在训练时同时利用连续的 latent representation 与从分布真正采样出来的 discrete token。这样既利用 latent representation 中丰富的信息，又通过 discrete sampling 引入随机性。
 
 所以可以把它理解成 $\boxed{\text{连续思考}+\text{离散采样}}$，论文相关工作里提到，有方法通过混合 latent 与 sampled discrete tokens 来引入随机性。
-
-### 三个东西最简单的区别
-
-$\text{Gaussian noise}$
-
-是在问：**怎么让 latent 随机起来？**
-
-$\text{Reparameterization}$
-
-是在问：**随机采样以后怎么反向传播？**
-
-$\text{latent}+\text{discrete token}$
-
-是在问：**连续推理和离散采样怎么结合？**
-
-所以它们其实不是三个完全平行的“算法”，而是在解决 latent reasoning 里的**不同技术问题**。
-
-因此，到这篇论文出现之前，前人的路线实际上已经发展到了 $\text{离散 CoT} \rightarrow \text{连续 latent reasoning} \rightarrow \text{随机 latent reasoning} \rightarrow \text{latent reasoning + RL}$。真正还没有被很好解决的问题是：**如何既让 latent reasoning 保持随机探索能力，又直接通过强化学习优化这些连续 latent states**。
 # 二、创新点与贡献
+## 2.1 用 Gumbel-Softmax 给 latent reasoning 引入可控随机性
+
+以往很多 latent reasoning 虽然保留的是连续分布，但同一个输入通常还是会得到相同的 latent trajectory，缺少真正的轨迹级探索。
+
+LEPO 的第一个核心改进是 $\pi_t\rightarrow\text{Gumbel-Softmax}\rightarrow z_t$，也就是在原始词表概率分布 $\pi_t$ 上加入 Gumbel noise，得到随机 latent token $z_t$。这样，同一个问题可以采样出不同的 latent reasoning trajectory，从而恢复 trajectory-level exploration。
+
+与简单 Gaussian noise 相比，论文认为 Gumbel-Softmax 更适合这里，因为它仍然保持：
+
+- 是合法的概率分布；
+- 不会直接退化成 one-hot；
+- 尽量保留原始概率分布的信息。
+
+所以第一项创新可以概括成 $\boxed{\text{Deterministic Latent Reasoning}\rightarrow\text{Stochastic Latent Reasoning}}$。
+## 2.2 把强化学习直接作用到连续 latent reasoning 过程
+
+以往 RL 更多是在优化最后生成出来的 discrete token。
+
+LEPO 不只优化最终答案，还直接优化中间的 latent token。
+
+对于离散 token，仍然使用类似标准 policy gradient 的目标：
+
+$J_{\text{discrete}}$
+
+而对于连续 latent token，它把采样得到的 latent distribution $z_t$ 当成一个 soft label：
+
+$J_{\text{latent}}=\sum_t\hat A_i\sum_k z_{i,t,k}\log\pi_{\theta,k}$
+
+如果某条 rollout 最后奖励高，那么这条轨迹中出现过的 latent distributions 也会被强化。
+
+也就是说：
+
+$\boxed{\text{Reward 不只训练“最后说什么”}\rightarrow\text{也训练“中间怎么想”}}$
+
+这是 LEPO 最核心的方法贡献之一。
+
+---
+
+## 3. 统一优化 latent token 与 discrete token
+
+LEPO 进一步把两部分放进同一个训练目标：
+
+$J_{\text{total}}=J_{\text{latent}}+J_{\text{discrete}}$
+
+最终整体目标再加入 KL regularization：
+
+$J_{\text{LEPO}}=J_{\text{total}}-\beta D_{\mathrm{KL}}$
+
+所以一条完整 trajectory 中：
+
+$\text{latent reasoning}\rightarrow\text{discrete answer}$
+
+前半段的“隐式思考”和后半段的“显式回答”可以在同一个 RL 框架里联合优化。
+
+这就是论文所谓的：
+
+> unified gradient estimation / unified optimization objective
+
+---
+
+## 4. 实验证明 stochastic latent reasoning 更适合探索和 RL
+
+论文不只是提出方法，还专门做了 motivation experiments，证明加入随机性之后：
+
+- entropy 更高；
+    
+- Pass@32 更高；
+    
+- 更多原本几乎做不出来的问题，被移动到“中等难度、可以通过 RL 学会”的区域。
+    
+
+作者因此认为：
+
+$\text{更强探索}\rightarrow\text{更多可学习轨迹}\rightarrow\text{更有效 RL}$
+
+而正式实验中，LEPO 也比 discrete RL 和已有 latent RL baseline 表现更好。
+
+论文自己总结的三项主要贡献就是：
+
+- 验证 stochastic latent reasoning 的探索优势；
+    
+- 提出 LEPO 这一 latent RL 框架；
+    
+- 在多个 benchmark 上取得更好结果。
+    
+
+### 一句话总结
+
+LEPO 真正的创新可以压成：
+
+$\boxed{\text{随机化 latent reasoning}+\text{直接优化 latent states}+\text{latent / discrete 联合 RL}}$
+
+它不是单纯“用了 Gumbel-Softmax”，而是把 **随机 latent trajectory 的生成与强化学习训练完整接起来了**。
 
 # 三、实验与结论（数据说明了什么、有什么局限性）
 
