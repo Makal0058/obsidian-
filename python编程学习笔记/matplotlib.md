@@ -24,10 +24,11 @@ plt.ylabel("Square of Value", fontsize=14)
 ```python
 squares = [1, 4, 9, 16, 25]
 
-plt.plot(squares, linewidth=5)
+plt.plot(squares, linewidth=5, c='red', alpha=0.5)
 plt.show()
 ```
-`plt.show()` 显示已经绘制好的图表。
+- `plt.show()`：显示已经绘制好的图表。
+- `alpha`：设置图形元素的透明度，取值通常为 $0\sim1$，值越小越透明。
 3. **plt.tick_params()**
 函数 `tick_params()` 设置刻度的样式，其中指定的实参将影响 x 轴和 y 轴上的刻度（`axis='both'`），并将刻度标记的字号设置为 14（`labelsize=14`）。
 ```python、
