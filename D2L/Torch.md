@@ -31,8 +31,17 @@ values, indices = torch.sort(x)
 values, _ = torch.sort(x)
 ```
 其中 `indices = [1, 2, 0]` 表示排序后的元素原来在哪，`_` 表示该返回值不需要使用（惯例）。
+5. **repeat()**
+`repeat()`：**重复整个张量 / 整块复制**，形式是 `张量.repeat(第0维重复次数, 第1维重复次数, 第2维重复次数, ...)`，也可以把这些数字写成一个元组 `张量.repeat((2, 3))` 和 `张量.repeat(2, 3)` 是一样的。
+```python
+x_train = [1, 2, 3]
+n_train = 3
+
+X_tile = x_train.repeat((n_train, 1))
+````
+则 $X_{\text{tile}}=\begin{bmatrix}1&2&3\\1&2&3\\1&2&3\end{bmatrix}$，形状 `[3, 3]`。也就是把 `x_train` **复制 3 行**。  
 5. **repeat_interleave()**
-`torch.repeat_interleave()`：把元素重复若干次。
+`torch.repeat_interleave()`：把每个元素重复若干次。
 ```python
 import torch
 
@@ -79,3 +88,51 @@ print(y.shape)
 `torch.bmm()` 一次性对一批矩阵分别做矩阵乘法。
 
 普通矩阵乘法是 `torch.matmul(A, B)`，而 bmm 专门处理这种三维张量 `A.shape = (batch, m, n)`、`B.shape = (batch, n, p)`，那么 `torch.bmm(A, B)` 输出 `(batch, m, p)`，也就是每个 batch 单独算 `A_iB_i`
+10. **.type(torch.bool)**
+`.type(torch.bool)` 作用是：**把张量的数据类型转换成布尔类型 `bool`**。
+```python
+x = torch.tensor([0, 1, 2])
+x.type(torch.bool)
+
+>>>tensor([False, True, True])
+```
+规则：$\begin{cases} 0 → False \\ 非 0 → True \end{cases}$
+11. **nn.MSELoss()**
+`nn.MSELoss()` 是 **PyTorch 的均方误差损失函数**，计算的是 $\text{MSE}=\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat y_i)^2$，也就是**预测值和真实值的差，先平方，再取平均。**
+```python
+import torch
+from torch import nn
+
+loss = nn.MSELoss()
+
+y_pred = torch.tensor([2.0, 4.0])
+y_true = torch.tensor([1.0, 5.0])
+
+print(loss(y_pred, y_true))
+
+>>>tensor(1.)
+```
+
+计算：
+- $(2-1)^2=1$
+- $(4-5)^2=1$
+
+平均：$\frac{1+1}{2}=1$
+
+注：`reduction='none'` 的意思是**每个样本的损失都保留下来，不求平均，也不求和**。
+```python
+loss = nn.MSELoss(reduction='none')
+
+y_pred = torch.tensor([2.0, 4.0])
+y_true = torch.tensor([1.0, 6.0])
+
+loss(y_pred, y_true)
+
+>>>tensor([1., 4.])
+```
+- $(2-1)^2=1$
+- $(4-6)^2=4$
+所以直接保留 `[1, 4]`
+规则：$\begin{cases} none → 不处理 \\ mean → 求平均 \\ sum  → 求和 \end{cases}$
+12. **net.parameters()**
+`net.parameters()` 作用是**取出模型里所有需要训练的参数**。
