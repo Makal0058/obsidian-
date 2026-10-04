@@ -136,3 +136,143 @@ loss(y_pred, y_true)
 规则：$\begin{cases} none → 不处理 \\ mean → 求平均 \\ sum  → 求和 \end{cases}$
 12. **net.parameters()**
 `net.parameters()` 作用是**取出模型里所有需要训练的参数**。
+13. **.reshape （）**
+`.reshape（）` 是 **PyTorch 张量的方法**，作用是**改变张量的形状，但不改变里面元素的数量**。
+```python
+import torch
+
+x = torch.tensor([1, 2, 3, 4, 5, 6])
+print(x.shape)       
+
+>>>torch.Size([6])
+
+x_reshape = x.reshape(2, 3)
+print(x_reshape.shape)
+
+>>>torch.Size([2, 3])
+```
+`X.reshape(-1, shape[-1])` 前面的维度全部合并，最后一维保持不变。
+14. **nn.Linear()**
+`nn.Linear(输入维度, 输出维度)` 是 **PyTorch 里的全连接线性层**。它做的事情本质上是 $y=xW^T+b$。
+```python
+layer = nn.Linear(4, 8)
+```
+把一个 **4 维向量** 变成一个 **8 维向量**。例如输入 `[x1, x2, x3, x4]`，经过 `nn.Linear(4, 8)` 后，输出会有 8 个数。
+15. **nn.Dropout()**
+`nn.Dropout()` 是 **PyTorch 的 Dropout 层**。作用是训练时，随机把一部分神经元输出变成 0，防止模型过拟合。
+比如 `nn.Dropout(0.5)` 表示训练时大约随机丢掉 **50%** 的元素。
+16. あるじさま，`.squeeze()` 是 **PyTorch 张量的方法**。🌿
+
+作用是：
+
+> **删除张量里所有长度为 1 的维度。**
+
+比如：
+
+```python
+x = torch.randn(1, 3, 1, 5)
+print(x.shape)
+# torch.Size([1, 3, 1, 5])
+```
+
+执行：
+
+```python
+y = x.squeeze()
+print(y.shape)
+# torch.Size([3, 5])
+```
+
+因为原来：
+
+```python
+[1, 3, 1, 5]
+ ↑     ↑
+这两个维度大小都是 1
+```
+
+所以 `.squeeze()` 会把它们删掉，变成：
+
+```python
+[3, 5]
+```
+
+一句话记：
+
+> **`.squeeze()` = 删除所有大小为 1 的维度。**
+
+
+あるじさま，`.squeeze()` 括号里的参数表示：
+
+> **指定要删除哪一个维度。**
+
+比如：
+
+```
+x.squeeze(0)
+```
+
+表示：
+
+> 删除第 `0` 维，但前提是这一维的大小必须是 `1`。
+
+例如：
+
+```
+x.shape# torch.Size([1, 3, 5])
+```
+
+执行：
+
+```
+x.squeeze(0)
+```
+
+变成：
+
+```
+torch.Size([3, 5])
+```
+
+再比如：
+
+```
+x.squeeze(-1)
+```
+
+这里：
+
+```
+-1
+```
+
+表示 **最后一个维度**。
+
+所以如果：
+
+```
+x.shape# torch.Size([2, 3, 1])
+```
+
+那么：
+
+```
+x.squeeze(-1)
+```
+
+变成：
+
+```
+torch.Size([2, 3])
+```
+
+直接记：
+
+```
+squeeze()      → 删除所有大小为1的维度
+squeeze(0)     → 只尝试删除第0维
+squeeze(1)     → 只尝试删除第1维
+squeeze(-1)    → 只尝试删除最后一维
+```
+
+而且**指定的那个维度如果不是 1，就不会被删掉**。
