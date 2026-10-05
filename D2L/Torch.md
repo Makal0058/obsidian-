@@ -161,118 +161,42 @@ layer = nn.Linear(4, 8)
 15. **nn.Dropout()**
 `nn.Dropout()` 是 **PyTorch 的 Dropout 层**。作用是训练时，随机把一部分神经元输出变成 0，防止模型过拟合。
 比如 `nn.Dropout(0.5)` 表示训练时大约随机丢掉 **50%** 的元素。
-16. あるじさま，`.squeeze()` 是 **PyTorch 张量的方法**。🌿
-
-作用是：
-
-> **删除张量里所有长度为 1 的维度。**
-
-比如：
-
+16. **.squeeze()**
+`.squeeze()` 是 **PyTorch 张量的方法**，作用是**删除张量里所有长度为 1 的维度**。
 ```python
 x = torch.randn(1, 3, 1, 5)
 print(x.shape)
-# torch.Size([1, 3, 1, 5])
-```
 
-执行：
+>>>torch.Size([1, 3, 1, 5])
 
-```python
 y = x.squeeze()
 print(y.shape)
-# torch.Size([3, 5])
+
+>>>torch.Size([3, 5])
 ```
-
-因为原来：
-
+`.squeeze()` 括号里的参数表示**指定要删除哪一个维度**，而且**指定的那个维度如果不是 1**，**就不会被删掉**。
+17. **torch.randn()**
+`torch.randn()` 是 **PyTorch 用来生成随机张量的函数**，它生成的随机数来自**标准正态分布**，也就是 $\mathcal{N}(0,1)$。括号里的参数表示**要生成的张量形状**。
 ```python
-[1, 3, 1, 5]
- ↑     ↑
-这两个维度大小都是 1
+import torch
+x = torch.randn(3)
+print(x)
+
+>>>tensor([ 0.52, -1.13, 0.08])
 ```
-
-所以 `.squeeze()` 会把它们删掉，变成：
-
+18. **torch.normal()**
+`torch.normal(mean, std, size)` 是 **PyTorch 生成正态分布随机数** 的函数，和 `torch.randn()` 的区别是可以自己指定均值 `mean`、标准差 `std`。
 ```python
-[3, 5]
+torch.normal(0.0, 1.0, (3,))
+
+>>>tensor([ 0.32, -1.15, 0.67])
 ```
+意思是生成 3 个服从均值 0、标准差 1 的正态分布随机数。
+19. **attention.eval()**
+`attention.eval()` 是 **PyTorch 模型的方法**，意思是**把模型切换到“评估模式 / 测试模式”**。这时候像 `nn.Dropout(...)` 就会停止随机丢弃神经元。
 
-一句话记：
-
-> **`.squeeze()` = 删除所有大小为 1 的维度。**
-
-
-あるじさま，`.squeeze()` 括号里的参数表示：
-
-> **指定要删除哪一个维度。**
-
-比如：
-
+也就是说：
+```python
+训练时：Dropout 生效
+eval() 后：Dropout 关闭
 ```
-x.squeeze(0)
-```
-
-表示：
-
-> 删除第 `0` 维，但前提是这一维的大小必须是 `1`。
-
-例如：
-
-```
-x.shape# torch.Size([1, 3, 5])
-```
-
-执行：
-
-```
-x.squeeze(0)
-```
-
-变成：
-
-```
-torch.Size([3, 5])
-```
-
-再比如：
-
-```
-x.squeeze(-1)
-```
-
-这里：
-
-```
--1
-```
-
-表示 **最后一个维度**。
-
-所以如果：
-
-```
-x.shape# torch.Size([2, 3, 1])
-```
-
-那么：
-
-```
-x.squeeze(-1)
-```
-
-变成：
-
-```
-torch.Size([2, 3])
-```
-
-直接记：
-
-```
-squeeze()      → 删除所有大小为1的维度
-squeeze(0)     → 只尝试删除第0维
-squeeze(1)     → 只尝试删除第1维
-squeeze(-1)    → 只尝试删除最后一维
-```
-
-而且**指定的那个维度如果不是 1，就不会被删掉**。
