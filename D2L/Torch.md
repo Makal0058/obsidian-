@@ -72,7 +72,18 @@ torch.normal(0.0, 1.0, (3,))
 >>>tensor([ 0.32, -1.15, 0.67])
 ```
 意思是生成 3 个服从均值 0、标准差 1 的正态分布随机数。
+10. **.pow()**
+`张量.pow(底数, 指数)` 是 **PyTorch 张量的方法**，作用是**做幂运算**。
+- `torch.pow(底数, 指数)`
+- `张量.pow(指数)`
+```python
+import torch
 
+x = torch.tensor([2.0, 3.0])
+print(x.pow(2))
+
+>>>tensor([4., 9.])
+```
 # 二、torch.Tensor 张量方法
 
 1. **repeat()**
@@ -170,6 +181,21 @@ print(X.shape)
 
 >>>torch.Size([2, 5, 4, 20])
 ```
+9. **切片语法 \[start : stop : step\]**
+`[start : stop : step]` 含义分别是：start → 从哪里开始、stop  → 到哪里结束，但不包含这个位置、step  → 步长，每隔几个取一次。
+单独一个 `:` 在 Python 切片里表示**这一维全部都要**；`::` 本身也是切片的一部分，表示 `start : stop : step`。`::2` 其实就是 start 省略、stop 省略、step = 2。`:stop` 表示**从开头开始，一直取到 `stop` 之前**。
+```python
+a = [0, 1, 2, 3, 4, 5]
+print(a[:4])
+
+>>>[0, 1, 2, 3]
+
+b = [0, 1, 2, 3, 4, 5, 6]
+print(b[0:6:2])
+
+>>>[0, 2, 4]
+```
+表示从 0 开始，到 6 之前，每隔 2 个取一个。
 # 三、torch.nn（含 nn.Module 模型方法）
 
 1. **nn.MSELoss()**
