@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="820" viewBox="0 0 3200 820"><rect width="100%" height="100%" fill="white"/>
+<line x1="62" x2="3138" y1="26" y2="26" stroke="#4a5965" stroke-width="3"/>
+<text x="1205.142857142857" y="86" font-family="PingFang SC" font-size="34" font-weight="bold" text-anchor="middle" fill="#253441">答案级诊断</text>
+<text x="2558.142857142857" y="86" font-family="PingFang SC" font-size="34" font-weight="bold" text-anchor="middle" fill="#253441">路径级诊断</text>
+<line x1="432" x2="3138" y1="115" y2="115" stroke="#b9c7d1" stroke-width="1.5"/>
+<text x="818.5714285714286" y="164" font-family="PingFang SC" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">(a) 四跳链式图</text>
+<text x="818.5714285714286" y="207" font-family="Times New Roman, Times, serif" font-size="27" font-weight="bold" text-anchor="middle" fill="#536c81">answer_only</text>
+<text x="1591.7142857142858" y="164" font-family="PingFang SC" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">(b) 六跳链式图</text>
+<text x="1591.7142857142858" y="207" font-family="Times New Roman, Times, serif" font-size="27" font-weight="bold" text-anchor="middle" fill="#536c81">answer_only</text>
+<text x="2268.2142857142853" y="164" font-family="PingFang SC" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">(c) 六跳分支图</text>
+<text x="2268.2142857142853" y="207" font-family="Times New Roman, Times, serif" font-size="27" font-weight="bold" text-anchor="middle" fill="#536c81">path_strict</text>
+<text x="2848.0714285714284" y="164" font-family="PingFang SC" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">(d) 十二跳分支图</text>
+<text x="2848.0714285714284" y="207" font-family="Times New Roman, Times, serif" font-size="27" font-weight="bold" text-anchor="middle" fill="#536c81">path_strict</text>
+<line x1="432" x2="3138" y1="231" y2="231" stroke="#b9c7d1" stroke-width="1.5"/>
+<text x="69" y="281" font-family="PingFang SC" font-size="31" font-weight="bold" text-anchor="start" fill="#253441">模型</text>
+<text x="528.6428571428571" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">S<tspan baseline-shift="sub" font-size="65%">last</tspan></text>
+<text x="721.9285714285714" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">S<tspan baseline-shift="sub" font-size="65%">serial</tspan></text>
+<text x="915.2142857142857" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">S<tspan baseline-shift="sub" font-size="65%">full</tspan></text>
+<text x="1108.5" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="bold" text-anchor="middle" fill="#253441">EAR</text>
+<text x="1301.7857142857142" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">S<tspan baseline-shift="sub" font-size="65%">last</tspan></text>
+<text x="1495.0714285714284" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">S<tspan baseline-shift="sub" font-size="65%">serial</tspan></text>
+<text x="1688.357142857143" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">S<tspan baseline-shift="sub" font-size="65%">full</tspan></text>
+<text x="1881.642857142857" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="bold" text-anchor="middle" fill="#253441">EAR</text>
+<text x="2074.9285714285716" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="bold" text-anchor="middle" fill="#253441">TAC</text>
+<text x="2268.2142857142853" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="bold" text-anchor="middle" fill="#253441">PathValid</text>
+<text x="2461.5" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">Δ<tspan baseline-shift="sub" font-size="65%">illegal</tspan></text>
+<text x="2654.785714285714" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="bold" text-anchor="middle" fill="#253441">TAC</text>
+<text x="2848.0714285714284" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="bold" text-anchor="middle" fill="#253441">PathValid</text>
+<text x="3041.3571428571427" y="281" font-family="Times New Roman, Times, serif" font-size="29" font-weight="normal" text-anchor="middle" fill="#253441">Δ<tspan baseline-shift="sub" font-size="65%">illegal</tspan></text>
+<line x1="62" x2="3138" y1="311" y2="311" stroke="#4a5965" stroke-width="2"/>
+<text x="69" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="start" fill="#253441">DeepSeek-V4-Flash</text>
+<text x="528.6428571428571" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">68.50</text>
+<text x="721.9285714285714" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.00</text>
+<text x="915.2142857142857" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1108.5" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">63.75</text>
+<text x="1301.7857142857142" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">67.17</text>
+<text x="1495.0714285714284" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1688.357142857143" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1881.642857142857" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">77.27</text>
+<text x="2074.9285714285716" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.69</text>
+<text x="2268.2142857142853" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">78.56</text>
+<text x="2461.5" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">21.12</text>
+<text x="2654.785714285714" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.31</text>
+<text x="2848.0714285714284" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">48.50</text>
+<text x="3041.3571428571427" y="386" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">50.81</text>
+<text x="69" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="start" fill="#253441">GPT-5.4-mini</text>
+<text x="528.6428571428571" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">71.00</text>
+<text x="721.9285714285714" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">2.50</text>
+<text x="915.2142857142857" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1108.5" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">58.25</text>
+<text x="1301.7857142857142" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">46.73</text>
+<text x="1495.0714285714284" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">1.01</text>
+<text x="1688.357142857143" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1881.642857142857" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">62.06</text>
+<text x="2074.9285714285716" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">94.31</text>
+<text x="2268.2142857142853" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">43.69</text>
+<text x="2461.5" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">50.62</text>
+<text x="2654.785714285714" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">79.88</text>
+<text x="2848.0714285714284" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">8.06</text>
+<text x="3041.3571428571427" y="475" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">71.81</text>
+<text x="69" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="start" fill="#253441">Qwen-Max</text>
+<text x="528.6428571428571" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">38.00</text>
+<text x="721.9285714285714" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.50</text>
+<text x="915.2142857142857" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1108.5" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">19.75</text>
+<text x="1301.7857142857142" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">3.00</text>
+<text x="1495.0714285714284" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1688.357142857143" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1881.642857142857" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">10.50</text>
+<text x="2074.9285714285716" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">100.00</text>
+<text x="2268.2142857142853" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">54.19</text>
+<text x="2461.5" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">45.81</text>
+<text x="2654.785714285714" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.19</text>
+<text x="2848.0714285714284" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">8.38</text>
+<text x="3041.3571428571427" y="564" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">90.81</text>
+<text x="69" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="start" fill="#253441">GLM-5.3-Flash</text>
+<text x="528.6428571428571" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">100.00</text>
+<text x="721.9285714285714" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">100.00</text>
+<text x="915.2142857142857" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">100.00</text>
+<text x="1108.5" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1301.7857142857142" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.50</text>
+<text x="1495.0714285714284" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.50</text>
+<text x="1688.357142857143" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">99.50</text>
+<text x="1881.642857142857" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.00</text>
+<text x="2074.9285714285716" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.94</text>
+<text x="2268.2142857142853" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">90.25</text>
+<text x="2461.5" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">9.75</text>
+<text x="2654.785714285714" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.56</text>
+<text x="2848.0714285714284" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">93.13</text>
+<text x="3041.3571428571427" y="653" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">6.88</text>
+<text x="69" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="start" fill="#253441">DeepSeek-V4-Pro</text>
+<text x="528.6428571428571" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">100.00</text>
+<text x="721.9285714285714" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">100.00</text>
+<text x="915.2142857142857" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">100.00</text>
+<text x="1108.5" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.00</text>
+<text x="1301.7857142857142" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">100.00</text>
+<text x="1495.0714285714284" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">100.00</text>
+<text x="1688.357142857143" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">99.50</text>
+<text x="1881.642857142857" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.25</text>
+<text x="2074.9285714285716" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.94</text>
+<text x="2268.2142857142853" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">99.94</text>
+<text x="2461.5" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">0.00</text>
+<text x="2654.785714285714" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">99.56</text>
+<text x="2848.0714285714284" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="bold" text-anchor="middle" fill="#253441">91.81</text>
+<text x="3041.3571428571427" y="742" font-family="Times New Roman, Times, serif" font-size="31" font-weight="normal" text-anchor="middle" fill="#253441">7.75</text>
+<line x1="62" x2="3138" y1="795" y2="795" stroke="#4a5965" stroke-width="3"/>
+</svg>
