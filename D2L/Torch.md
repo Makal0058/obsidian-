@@ -269,6 +269,107 @@ eval() 后：Dropout 关闭
 样本3：[3, 30]
 ```
 它会分别对 `第1个特征：[1, 2, 3]`、`第2个特征：[10, 20, 30]` 做归一化。
+8. **nn.Embedding()**
+`nn.Embedding()` 是 **PyTorch 自带的词嵌入层**，作用是**把词元 ID（整数）转换成可以训练的向量**。 
+```python
+import torch
+from torch import nn
+
+embedding = nn.Embedding(3, 4) # 创建词嵌入层，词表大小为3，每个词元转换成4维向量
+X = torch.tensor([0, 2]) # 输入两个词元ID
+Y = embedding(X) # 将词元ID转换成向量
+
+print(X.shape)
+
+>>>torch.Size([2])
+
+print(Y.shape)
+
+>>>torch.Size([2, 4])
+```
+- 为什么需要 Embedding？
+>假设有一句话 `我 喜欢 猫`，模型先把它们转换成词元 ID：`我 → 0`、`喜欢 → 1`、`猫 → 2`，但这些数字只是编号。例如，“猫”的编号是 `2`，“喜欢”的编号是 `1`，并不意味着“猫”比“喜欢”大两倍。因此，我们需要把每个词元转换成向量。
+- `nn.Embedding()` 怎么工作？
+```python
+nn.Embedding(num_embeddings, embedding_dim)
+```
+>两个参数分别是：num_embeddings：词表大小，即有多少个不同的词元 ID、embedding_dim：每个词元转换成多少维的向量。
+```python
+embedding = nn.Embedding(3, 4)
+```
+>表示：**词表有 3 个词元，每个词元用 4 维向量表示**。PyTorch 会创建一个可以训练的嵌入矩阵，假设这个矩阵是：
+>$E=\begin{bmatrix}0.1&0.2&0.3&0.4\\0.5&0.6&0.7&0.8\\0.9&1.0&1.1&1.2\end{bmatrix}$
+>其中：
+```text
+第0行 → 词元0的向量
+第1行 → 词元1的向量
+第2行 → 词元2的向量
+```
+>当输入 `torch.tensor([0, 2])`，Embedding 就会取出第 0 行和第 2 行：
+>$\begin{bmatrix}0.1&0.2&0.3&0.4\\0.9&1.0&1.1&1.2\end{bmatrix}$
+
+**注：Embedding 本质上是查表，不是把整数直接代入公式计算。**
+
+- Embedding 的向量是怎么来的？
+>**Embedding 的向量不是人工提前规定的，而是模型通过训练学习出来的**。初始时，PyTorch 默认使用随机初始化的向量。例如：`猫 → [0.2, -0.8, 0.1, 0.5]`，经过训练，模型通过反向传播逐渐调整这些数值，让它们更适合当前任务。
+## 五、对应您书里的代码
+
+```python
+self.embedding = nn.Embedding(
+    vocab_size,
+    num_hiddens
+)
+```
+
+假设：
+
+```python
+vocab_size = 200
+num_hiddens = 24
+```
+
+就是：
+
+```python
+nn.Embedding(200, 24)
+```
+
+表示：
+
+> 创建一个包含 200 个词元向量的嵌入表，每个向量有 24 维。
+
+如果输入：
+
+```python
+X.shape
+# torch.Size([2, 100])
+```
+
+经过：
+
+```python
+self.embedding(X)
+```
+
+形状就变成：
+
+```python
+torch.Size([2, 100, 24])
+```
+
+含义是：
+
+```text
+2   → 2个样本
+100 → 每个样本100个词元
+24  → 每个词元转换成24维向量
+```
+
+---
+
+**最终记住一句话：**
+
+`nn.Embedding(词表大小, 向量维度)` 是 PyTorch 自带的词嵌入层，**根据词元 ID 查找对应的可训练向量**，让神经网络能够处理词元的向量表示。
 # 四、Python 语法
 1. **对象[下标]**
 `对象[下标]` 是 **Python 的索引语法**，表示从一个对象里，取指定位置的元素。`函数(...)[0]` = **先执行函数，再对函数返回结果做 `[0]` 索引。**
