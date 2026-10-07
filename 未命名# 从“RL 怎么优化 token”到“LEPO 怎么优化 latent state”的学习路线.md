@@ -1,5 +1,5 @@
 
-# 从“RL 怎么优化 token”到“LEPO 怎么优化 latent state”的学习路线
+
 
 这次别围着 LEPO 这一篇补洞了。您真正需要的是一条**从“RL 是怎么优化 token 的”一路学到“为什么 LEPO 能优化 latent state”**的完整学习路线。🌿
 
