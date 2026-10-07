@@ -196,8 +196,26 @@ print(b[0:6:2])
 >>>[0, 2, 4]
 ```
 表示从 0 开始，到 6 之前，每隔 2 个取一个。
-# 三、torch.nn（含 nn.Module 模型方法）
+10. **torch.cat()**
+`torch.cat((张量1, 张量2, ...), dim=某个维度)` 是 **PyTorch 自带的张量拼接函数**，作用是**把多个张量沿指定维度拼接起来**。
+```python
+import torch
 
+A = torch.tensor([[1, 2]])
+B = torch.tensor([[3, 4]])
+print(torch.cat((A, B), dim=0))
+
+>>>tensor([[1, 2],
+         [3, 4]])
+```
+这里 `dim=0` 表示沿第 0 维拼，也就是**上下拼接**。
+```python
+print(torch.cat((A, B), dim=1))
+
+>>>tensor([[1, 2, 3, 4]])
+```
+这里 `dim=1` 表示沿第 1 维拼，也就是**左右拼接**。
+# 三、torch.nn（含 nn.Module 模型方法）
 1. **nn.MSELoss()**
 `nn.MSELoss()` 是 **PyTorch 的均方误差损失函数**，计算的是 $\text{MSE}=\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat y_i)^2$，也就是**预测值和真实值的差，先平方，再取平均。**
 ```python
@@ -312,64 +330,58 @@ embedding = nn.Embedding(3, 4)
 
 - Embedding 的向量是怎么来的？
 >**Embedding 的向量不是人工提前规定的，而是模型通过训练学习出来的**。初始时，PyTorch 默认使用随机初始化的向量。例如：`猫 → [0.2, -0.8, 0.1, 0.5]`，经过训练，模型通过反向传播逐渐调整这些数值，让它们更适合当前任务。
-## 五、对应您书里的代码
-
+9. **nn.Sequential()**
+`nn.Sequential(网络层1, 网络层2, 网络层3, ...)` 是 **PyTorch 自带的神经网络容器类**，作用是**把多个神经网络层按顺序组合起来，输入数据后依次执行这些层**。
 ```python
-self.embedding = nn.Embedding(
-    vocab_size,
-    num_hiddens
+import torch
+from torch import nn
+
+net = nn.Sequential( # 创建神经网络
+    nn.Linear(4, 8),
+    nn.ReLU(),
+    nn.Linear(8, 2)
+)
+X = torch.ones((3, 4)) # 输入数据
+Y = net(X) # 前向传播
+
+print(Y.shape)
+
+>>>torch.Size([3, 2])
+```
+这里的数据变化是 $4维\rightarrow8维\rightarrow\operatorname{ReLU}\rightarrow2维$
+10. **nn.ReLU()**
+`nn.ReLU()` 是 **PyTorch 自带的激活层**，作用是**把小于 0 的数变成 0，大于等于 0 的数保持不变**。公式 $\operatorname{ReLU}(x)=\max(0,x)$。它主要作用是给神经网络**加入非线性**，否则连续多个 `Linear` 本质上仍然只是一个线性变换。
+```python
+import torch
+from torch import nn
+
+relu = nn.ReLU()
+X = torch.tensor([-2.0, -1.0, 0.0, 2.0, 3.0])
+print(relu(X))
+
+>>>tensor([0., 0., 0., 2., 3.])
+```
+11. **add_module()**
+`add_module(名字, 子模块)` 是 **PyTorch 自带的 `nn.Module` 方法**，作用是**给一个神经网络模块手动添加一个子模块，并给它起名字**。
+```python
+from torch import nn  
+
+net = nn.Sequential()  
+net.add_module(  
+    "layer1",  
+    nn.Linear(4, 8)  
+)  
+net.add_module(  
+    "relu",  
+    nn.ReLU()  
+)  
+print(net)
+
+>>>Sequential(
+  (layer1): Linear(in_features=4, out_features=8, bias=True)
+  (relu): ReLU()
 )
 ```
-
-假设：
-
-```python
-vocab_size = 200
-num_hiddens = 24
-```
-
-就是：
-
-```python
-nn.Embedding(200, 24)
-```
-
-表示：
-
-> 创建一个包含 200 个词元向量的嵌入表，每个向量有 24 维。
-
-如果输入：
-
-```python
-X.shape
-# torch.Size([2, 100])
-```
-
-经过：
-
-```python
-self.embedding(X)
-```
-
-形状就变成：
-
-```python
-torch.Size([2, 100, 24])
-```
-
-含义是：
-
-```text
-2   → 2个样本
-100 → 每个样本100个词元
-24  → 每个词元转换成24维向量
-```
-
----
-
-**最终记住一句话：**
-
-`nn.Embedding(词表大小, 向量维度)` 是 PyTorch 自带的词嵌入层，**根据词元 ID 查找对应的可训练向量**，让神经网络能够处理词元的向量表示。
 # 四、Python 语法
 1. **对象[下标]**
 `对象[下标]` 是 **Python 的索引语法**，表示从一个对象里，取指定位置的元素。`函数(...)[0]` = **先执行函数，再对函数返回结果做 `[0]` 索引。**
