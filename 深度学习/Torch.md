@@ -257,16 +257,45 @@ A = torch.tensor([[1, 2]])
 B = torch.tensor([[3, 4]])
 print(torch.cat((A, B), dim=0))
 
->>>tensor([[1, 2],
+>>> tensor([[1, 2],
          [3, 4]])
 ```
 这里 `dim=0` 表示沿第 0 维拼，也就是**上下拼接**。
 ```python
 print(torch.cat((A, B), dim=1))
 
->>>tensor([[1, 2, 3, 4]])
+>>> tensor([[1, 2, 3, 4]])
 ```
 这里 `dim=1` 表示沿第 1 维拼，也就是**左右拼接**。
+11. **.dtype**
+`.dtype` 是 PyTorch 张量（`torch.Tensor`）的一个属性（Attribute），用于获取张量中元素的数据类型。
+```python
+import torch
+
+x = torch.tensor([1.0, 2.0, 3.0])
+print(x.dtype)
+
+>>> torch.float32
+```
+12. **.type()**
+`.type()` 是 PyTorch 中 `torch.Tensor` 类的方法（Method），主要用于查看或转换张量的数据类型。**不传参数用于查看张量类型；传入参数用于转换数据类型**。
+```python
+import torch
+
+x = torch.tensor([1.0, 2.0, 3.0])
+
+print(type(x))
+>>> <class 'torch.Tensor'>
+
+print(x.type())
+>>> torch.FloatTensor
+
+x.type(torch.float16) #将张量 `x` 转换为 16 位浮点数类型。
+```
+
+注：
+- `type(x)`：Python 内置函数，获取对象的类型。
+- `x.type()`：PyTorch 张量的方法，可以查看张量类型，也可以转换类型。
 # 三、torch.nn（含 nn.Module 模型方法）
 1. **nn.MSELoss()**
 `nn.MSELoss()` 是 **PyTorch 的均方误差损失函数**，计算的是 $\text{MSE}=\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat y_i)^2$，也就是**预测值和真实值的差，先平方，再取平均。**
@@ -281,7 +310,7 @@ y_true = torch.tensor([1.0, 5.0])
 
 print(loss(y_pred, y_true))
 
->>>tensor(1.)
+>>> tensor(1.)
 ```
 
 计算：
@@ -299,7 +328,7 @@ y_true = torch.tensor([1.0, 6.0])
 
 loss(y_pred, y_true)
 
->>>tensor([1., 4.])
+>>> tensor([1., 4.])
 ```
 - $(2-1)^2=1$
 - $(4-6)^2=4$
@@ -314,16 +343,86 @@ layer = nn.Linear(4, 8)
 ```
 把一个 **4 维向量** 变成一个 **8 维向量**。例如输入 `[x1, x2, x3, x4]`，经过 `nn.Linear(4, 8)` 后，输出会有 8 个数。
 4. **nn.Dropout()**
-`nn.Dropout()` 是 **PyTorch 的 Dropout 层**。作用是训练时，随机把一部分神经元输出变成 0，防止模型过拟合。
-比如 `nn.Dropout(0.5)` 表示训练时大约随机丢掉 **50%** 的元素。
+PyTorch 的 `torch.nn` 确实提供了两种 `Dropout` 接口 `nn.Dropout()与nn.functional.dropout()`。
+- `nn.Dropout(p，inplace)` 是 **PyTorch 的 Dropout 层**，作用是训练时随机把一部分神经元输出变成 0，防止模型过拟合。
+ > PyTorch 的 Dropout 在训练时会对保留下来的数值进行缩放，缩放公式 $x_{\text{保留后}}=\frac{x}{1-p}$。例如随机选择将第 1、3 个元素置零 $[1,2,3,4]\to[0,2,0,4]$，但 PyTorch 的 Dropout 还会把保留的元素除以 $1-p$，$\frac{1}{1-0.5}=2$，所以实际输出为 $[1,2,3,4]\to[0,4,0,8]$。乘以 2 是为了让 Dropout 输出的期望值与原输入相同，避免平均数值因随机置零而缩小。
+>
+ > 比如 p（随机失活概率）=0.5，则 `nn.Dropout(0.5)` 训练时大约随机丢掉 **50%** 的元素。
+ > 比如 `inplace（是否原地操作）=False`，则**不直接修改输入张量，返回处理后的结果**。不传 `inplace` 时，默认是 `False`。
+```python
+import torch
+from torch import nn
+
+x = torch.ones(4)
+dropout = nn.Dropout(p=0.5, inplace=False)
+y = dropout(x)
+print("x =", x)
+
+>>> x = tensor([1., 1., 1., 1.])
+
+print("y =", y)
+
+>>> y = tensor([0., 2., 0., 2.])
+```
+`inplace=True`：直接修改原张量
+```python
+import torch
+from torch import nn
+
+x = torch.ones(4)
+dropout = nn.Dropout(p=0.5, inplace=True)
+y = dropout(x)
+print("x =", x)
+
+>>> x = tensor([0., 2., 0., 2.])
+
+print("y =", y)
+
+>>> y = tensor([0., 2., 0., 2.])
+```
+- `nn.functional.dropout()`相比 `nn.Dropout()`，主要多了一个显式的 `training` 参数，以及一个必填的 `input` 参数。
+> `training` 可以直接控制是否启用随机失活。
+```python
+import torch
+import torch.nn.functional as F
+
+x = torch.ones(4)
+
+y = F.dropout(x, p=0.5, training=True) # 启用 Dropout
+z = F.dropout(x, p=0.5, training=False) # 关闭 Dropout
+```
+> `input` 是 `nn.functional.dropout()` 的输入张量参数，表示要对哪个张量执行 Dropout。
+```python
+import torch
+import torch.nn.functional as F
+
+x = torch.tensor([1.0, 2.0, 3.0, 4.0])
+y = F.dropout(
+    input=x,
+    p=0.5,
+    training=True
+)
+print(y)
+
+>>> tensor([0., 4., 0., 8.])
+```
+这里 `input=x` 表示对张量 `x` 执行 Dropout。Python 支持两种传参方式：
+
+| 写法                   | 名称      |
+| -------------------- | ------- |
+| `F.dropout(x)`       | 位置参数传递  |
+| `F.dropout(input=x)` | 关键字参数传递 |
+这里的 `attn_weights` 是经过 Softmax 得到的注意力权重张量，Dropout 会随机将其中部分权重置零，并对保留的权重进行缩放。
 5. **attention.eval()**
 `attention.eval()` 是 **PyTorch 模型的方法**，意思是**把模型切换到“评估模式 / 测试模式”**。这时候像 `nn.Dropout(...)` 就会停止随机丢弃神经元。
-
 也就是说：
 ```python
 训练时：Dropout 生效
 eval() 后：Dropout 关闭
 ```
+`attention.eval()` 与 `training=False` 两者都能关闭 Dropout，但控制的范围不同。
+- `training=False`：只控制当前这一次 `F.dropout()` 调用。
+- `attention.eval()`：将整个 `attention` 模块及其子模块切换到评估模式。
 6. nn.LayerNorm(...)
 `nn.LayerNorm(...)` 是**层归一化**：对一个样本内部的特征做归一化，让数值分布更稳定。参数表示**把多少个特征看成一组，放在一起做归一化**。
 比如一个词元向量：
@@ -355,7 +454,7 @@ print(X.shape)
 
 print(Y.shape)
 
->>>torch.Size([2, 4])
+>>> torch.Size([2, 4])
 ```
 - 为什么需要 Embedding？
 >假设有一句话 `我 喜欢 猫`，模型先把它们转换成词元 ID：`我 → 0`、`喜欢 → 1`、`猫 → 2`，但这些数字只是编号。例如，“猫”的编号是 `2`，“喜欢”的编号是 `1`，并不意味着“猫”比“喜欢”大两倍。因此，我们需要把每个词元转换成向量。
@@ -398,7 +497,7 @@ Y = net(X) # 前向传播
 
 print(Y.shape)
 
->>>torch.Size([3, 2])
+>>> torch.Size([3, 2])
 ```
 这里的数据变化是 $4维\rightarrow8维\rightarrow\operatorname{ReLU}\rightarrow2维$
 10. **nn.ReLU()**
@@ -456,32 +555,16 @@ print(y)
 >>> tensor([[0.0900, 0.2447, 0.6652],
         [0.0900, 0.2447, 0.6652]])
 ```
-## 五、相关写法
-
-以下三种写法都可以实现 Softmax：
-
-```python
-# 写法一
-nn.functional.softmax(x, dim=-1)
-
-# 写法二
-torch.softmax(x, dim=-1)
-
-# 写法三
-softmax = nn.Softmax(dim=-1)
-y = softmax(x)
-```
-
-在指定相同输入和维度时，它们执行相同的 Softmax 运算。
-
-总结：在 GPT-2 中，`nn.functional.softmax(attn_weights, dim=-1)` 将每个 Query 对所有 Key 的注意力分数转换成权重，为后续与 Value 的矩阵乘法做准备。
-
-# 四、Python 语法
+# 四、其他
 1. **对象[下标]**
 `对象[下标]` 是 **Python 的索引语法**，表示从一个对象里，取指定位置的元素。`函数(...)[0]` = **先执行函数，再对函数返回结果做 `[0]` 索引。**
 ```python
 a = [10, 20, 30]
 print(a[0])
 
->>>10
+>>> 10
 ```
+2. **隐藏维度**（Hidden Size）就是模型用多少个数字来表示一个 Token。假设输入一句话，经过分词器后得到 128 个 Token。GPT-2 会把每个 Token 转换成一个包含 768 个数字的向量。例如，第一个 Token $x_1=[0.12,\ 0.35,\ -0.21,\ \ldots,\ 0.67]$。所以：
+- 128：有多少个 Token。
+- 768：每个 Token 用多少个数字表示。
+整个隐藏状态矩阵就是 $X:(128,768)$。
