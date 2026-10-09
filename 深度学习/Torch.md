@@ -82,10 +82,25 @@ import torch
 x = torch.tensor([2.0, 3.0])
 print(x.pow(2))
 
->>>tensor([4., 9.])
+>>> tensor([4., 9.])
 ```
-# 二、torch.Tensor 张量方法
+11. **size()**
+在 PyTorch 中，`size()` 用于查看张量的形状，与 `shape` 类似。
+```python
+import torch
 
+query = torch.randn(2, 3, 4)
+
+print(query.size())
+
+>>> torch.Size([2, 3, 4])
+
+print(query.shape)
+
+>>> torch.Size([2, 3, 4])
+```
+说明 `query` 是一个三维张量，各维度大小分别为 2、3、4。
+# 二、torch.Tensor 张量方法
 1. **repeat()**
 `repeat()`：**重复整个张量 / 整块复制**，形式是 `张量.repeat(第0维重复次数, 第1维重复次数, 第2维重复次数, ...)`，也可以把这些数字写成一个元组 `张量.repeat((2, 3))` 和 `张量.repeat(2, 3)` 是一样的。
 ```python
@@ -164,11 +179,48 @@ print(y.shape)
 `.transpose(a, b)` 是 **PyTorch 张量的方法**，作用是**交换第 a 维和第 b 维**。
 ```python
 print(keys.shape)
->>>torch.Size([2, 10, 8])
+>>> torch.Size([2, 10, 8])
 
->>>print(keys.transpose(1, 2).shape)
->>>torch.Size([2, 8, 10])
+>>> print(keys.transpose(1, 2).shape)
+>>> torch.Size([2, 8, 10])
 ```
+
+注：
+- 二维矩阵转置：交换行和列。
+- 高维张量转置：交换指定的两个维度。
+1. **二维矩阵转置**
+假设 $K=\begin{bmatrix}1&2&3\\4&5&6\end{bmatrix}$，它有 2 行、3 列，形状是 $(2,3)$。转置就是把行变成列，列变成行，$K^\top=\begin{bmatrix}1&4\\2&5\\3&6\end{bmatrix}$，形状变成 $(3,2)$。
+```python
+import torch
+
+K = torch.tensor([
+    [1, 2, 3],
+    [4, 5, 6]
+])
+
+print(K.transpose(0, 1))
+
+>>> 
+```
+2. **三维张量转置**
+假设 $K[0]=\begin{bmatrix}1&2&3\\4&5&6\end{bmatrix}$、$K[1]=\begin{bmatrix}7&8&9\\10&11&12\end{bmatrix}$，这个张量的形状是 $(2,2,3)$，可以理解为**两个 $2\times3$ 的矩阵堆叠在一起**。
+```python
+K = torch.tensor([
+    [[1, 2, 3],
+     [4, 5, 6]],
+
+    [[7, 8, 9],
+     [10, 11, 12]]
+])
+```
+
+如果执行：
+```python
+K_T = K.transpose(-1, -2)
+```
+就是交换最后两个维度。
+
+原形状 $(2,2,3)$，转置后 $(2,3,2)$。$K_T[0]=\begin{bmatrix}1&4\\2&5\\3&6\end{bmatrix}$，3 行 × 2 列；$K_T[1]=\begin{bmatrix}7&10\\8&11\\9&12\end{bmatrix}$，3 行 × 2 列。两个矩阵没有交换位置，只是每个矩阵内部进行了转置。
 8. **permute()**
 `permute(新的维度顺序)` 是 **PyTorch 张量的方法**，作用是**按照指定的顺序，重新排列张量的各个维度**。`transpose()` 只能交换两个维度；`permute()` 可以一次重新排列所有维度。
 ```python
@@ -359,7 +411,7 @@ relu = nn.ReLU()
 X = torch.tensor([-2.0, -1.0, 0.0, 2.0, 3.0])
 print(relu(X))
 
->>>tensor([0., 0., 0., 2., 3.])
+>>> tensor([0., 0., 0., 2., 3.])
 ```
 11. **add_module()**
 `add_module(名字, 子模块)` 是 **PyTorch 自带的 `nn.Module` 方法**，作用是**给一个神经网络模块手动添加一个子模块，并给它起名字**。
@@ -377,11 +429,53 @@ net.add_module(
 )  
 print(net)
 
->>>Sequential(
+>>> Sequential(
   (layer1): Linear(in_features=4, out_features=8, bias=True)
   (relu): ReLU()
 )
 ```
+12. **nn.functional.softmax()**
+`nn.functional.softmax(input, dim)` 是 PyTorch 中的 Softmax 函数，`input` 是输入张量、`dim` 是指定沿哪个维度进行 Softmax。作用是将一组原始分数转换为非负权重，使指定维度上的权重之和等于 1，$\operatorname{softmax}(x_i)=\frac{e^{x_i}}{\sum_{j=1}^{n}e^{x_j}}$。
+其中：
+- $x_i$：第 $i$ 个原始分数。
+- $e$：自然常数，约等于 2.718。
+- $n$：参与 Softmax 计算的元素个数。
+```python
+import torch
+from torch import nn
+
+x = torch.tensor([
+    [1.0, 2.0, 3.0],
+    [4.0, 5.0, 6.0]
+])
+
+y = nn.functional.softmax(x, dim=-1)
+
+print(y)
+
+>>> tensor([[0.0900, 0.2447, 0.6652],
+        [0.0900, 0.2447, 0.6652]])
+```
+## 五、相关写法
+
+以下三种写法都可以实现 Softmax：
+
+```python
+# 写法一
+nn.functional.softmax(x, dim=-1)
+
+# 写法二
+torch.softmax(x, dim=-1)
+
+# 写法三
+softmax = nn.Softmax(dim=-1)
+y = softmax(x)
+```
+
+在指定相同输入和维度时，它们执行相同的 Softmax 运算。
+
+总结：在 GPT-2 中，`nn.functional.softmax(attn_weights, dim=-1)` 将每个 Query 对所有 Key 的注意力分数转换成权重，为后续与 Value 的矩阵乘法做准备。
+
 # 四、Python 语法
 1. **对象[下标]**
 `对象[下标]` 是 **Python 的索引语法**，表示从一个对象里，取指定位置的元素。`函数(...)[0]` = **先执行函数，再对函数返回结果做 `[0]` 索引。**

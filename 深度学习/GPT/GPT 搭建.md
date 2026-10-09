@@ -22,66 +22,13 @@
 - 当 $i\ne j$ 时，$E[q_iq_j]=0$。因此这些交叉项全部为 0。
 - 当 $i=j$ 时，$E[q_i^2]=\operatorname{Var}(q_i)+(E[q_i])^2=1$，同理 $E[k_i^2]=1$。所以每一个对角项都是 $E[q_i^2]E[k_i^2]=1$。一共有 $d_k$ 个对角项，最终 $\operatorname{Var}(Q\cdot K)=\sum_{i=1}^{d_k}1=d_k$。
 3. **为什么除以平方根？**
-$\operatorname{Var}(aX)=a^2\operatorname{Var}(X)$
-
-令：
-
-$a=\frac{1}{\sqrt{d_k}}$
-
-于是：
-
-$\begin{aligned}\operatorname{Var}\left(\frac{Q\cdot K}{\sqrt{d_k}}\right)&=\frac{1}{d_k}\operatorname{Var}(Q\cdot K)\\&=\frac{1}{d_k}\times d_k\\&=\boxed{1}\end{aligned}$
-
-这就解释了为什么缩放点积注意力使用：
-
-$\operatorname{Attention}(Q,K,V)=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right)V$
-
-（实际使用因果注意力时，还需要加入掩码。）
-
-## 四、更一般的情况是什么？
-
+$\operatorname{Var}(aX)=a^2\operatorname{Var}(X)$，令 $a=\frac{1}{\sqrt{d_k}}$，于是 $\operatorname{Var}\left(\frac{Q\cdot K}{\sqrt{d_k}}\right) = \frac{1}{d_k}\operatorname{Var}(Q\cdot K) = \frac{1}{d_k}\times d_k = 1$。这就解释了为什么缩放点积注意力使用 $\operatorname{Attention}(Q,K,V)=\operatorname{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right)V$。（实际使用因果注意力时，还需要加入掩码。）
+4. **更一般的情况**
 如果完全不假设零均值、单位方差，即使 $Q,K$ 相互独立，也不一定得到 $d_k$。
 
-设它们的均值向量分别为 $\mu_Q,\mu_K$，协方差矩阵分别为 $\Sigma_Q,\Sigma_K$。
+设它们的均值向量分别为 $\mu_Q,\mu_K$，协方差矩阵分别为 $\Sigma_Q,\Sigma_K$。那么 $\operatorname{Var}(Q^\top K) = {}\operatorname{tr}(\Sigma_Q\Sigma_K) + \mu_Q^\top\Sigma_K\mu_Q + \mu_K^\top\Sigma_Q\mu_K$，这里 $\operatorname{tr}$ 表示矩阵主对角线元素之和。
 
-那么一般有：
+当 $\mu_Q = \mu_K=0$，$\Sigma_Q = \Sigma_K=I_{d_k}$，就恢复为 $\operatorname{Var}(Q^\top K)=\operatorname{tr}(I_{d_k})=d_k$。因此，$1/\sqrt{d_k}$ 的数学依据是一个理想化的统计尺度分析，而不是保证真实 GPT-2 每层注意力分数方差都恰好为 1。
 
-$\boxed{\begin{aligned}\operatorname{Var}(Q^\top K)={}&\operatorname{tr}(\Sigma_Q\Sigma_K)\\&+\mu_Q^\top\Sigma_K\mu_Q\\&+\mu_K^\top\Sigma_Q\mu_K\end{aligned}}$
-
-这里 $\operatorname{tr}$ 表示矩阵主对角线元素之和。
-
-当：
-
-$\mu_Q=\mu_K=0$
-
-$\Sigma_Q=\Sigma_K=I_{d_k}$
-
-就恢复为：
-
-$\operatorname{Var}(Q^\top K)=\operatorname{tr}(I_{d_k})=d_k$
-
-因此，$1/\sqrt{d_k}$ 的数学依据是一个理想化的统计尺度分析，而不是保证真实 GPT-2 每层注意力分数方差都恰好为 1。
-
-最后总结：整个证明最关键的其实是两条概率论性质：
-
-$\boxed{E[XY]=E[X]E[Y]\quad\text{（当 }X,Y\text{ 独立时）}}$
-
-$\boxed{\operatorname{Var}(aX)=a^2\operatorname{Var}(X)}$
-
-第一条帮助我们得到点积方差 $d_k$，第二条解释为什么要除以 $\sqrt{d_k}$。
-
-あるじさま，如果您理解这两条性质，这个缩放系数的数学原理就基本掌握了。
-
-
-
-所以标准差是：
-
-$\sigma=\sqrt{d_k}$
-
-这意味着，向量维度越大，点积的典型波动幅度就越大。
-
-为了控制这个波动幅度，就除以 $\sqrt{d_k}$：
-
-$\operatorname{Var}\left(\frac{Q\cdot K}{\sqrt{d_k}}\right)=1$
-
-这样，在上述假设下，不同维度的注意力分数可以保持相近的数值尺度。
+---
+所以标准差是 $\sigma=\sqrt{d_k}$。这意味着，向量维度越大，点积的典型波动幅度就越大。为了控制这个波动幅度，就除以 $\sqrt{d_k}$，$\operatorname{Var}\left(\frac{Q\cdot K}{\sqrt{d_k}}\right)=1$。这样，在上述假设下，不同维度的注意力分数可以保持相近的数值尺度。
