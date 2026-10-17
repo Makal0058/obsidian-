@@ -355,6 +355,58 @@ print(x.shape)
 ```
 
 注：**`torch.empty()` 创建的张量虽然有确定的形状，但其元素数值是不确定的**。它可能包含内存中残留的数据，不能假设这些数据等于 0，也不能把它们当成有意义的随机数。
+
+14. **.item()**
+`.item()` 是 PyTorch 中非常常用的一个方法，用于**将只包含一个元素的张量（Tensor）转换成普通的 Python 数值**。例如，将 `tensor(3.14)` 转换成 Python 的浮点数 `3.14`。
+```python
+import torch
+
+x = torch.tensor(3.14)
+
+print(x)
+
+>>> tensor(3.1400)
+
+print(x.item())
+
+>>> 3.140000104904175
+
+print(type(x))
+
+>>> <class 'torch.Tensor'>
+
+print(type(x.item()))
+
+>>> <class 'float'>
+```
+`torch.tensor(3.14)` 默认使用 `float32` 保存数值，所以转换成 Python 浮点数后，可能出现微小的精度差异。
+15. **.view()**
+`.view(*shape)` 是 PyTorch 中非常常用的张量方法，用于改变张量的形状（Shape），但不改变元素的数值和总数量。其中参数 `shape` 是目标形状。与 `.reshape()` 非常相似，主要区别在于 **`.view()` 要求张量的内存布局与目标形状兼容，而 `.reshape()` 在必要时可以复制数据**。
+```python
+import torch
+
+x = torch.arange(12)
+print(x)
+
+>>> tensor([ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11])
+
+print(x.shape)
+
+>>> torch.Size([12])
+
+y = x.view(3, 4)
+print(y)
+
+>>> tensor([[ 0,  1,  2,  3],
+>>>         [ 4,  5,  6,  7],
+>>>         [ 8,  9, 10, 11]])
+
+print(y.shape)
+
+>>> torch.Size([3, 4])
+```
+
+原来的张量有 12 个元素，变形后的张量仍然有 12 个元素。因此，必须满足 $\text{改变形状前的元素总数}=\text{改变形状后的元素总数}$。
 # 三、torch.nn（含 nn.Module 模型方法）
 1. **nn.MSELoss()**
 `nn.MSELoss()` 是 **PyTorch 的均方误差损失函数**，计算的是 $\text{MSE}=\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat y_i)^2$，也就是**预测值和真实值的差，先平方，再取平均。**
@@ -506,7 +558,7 @@ eval() 后：Dropout 关闭
 [2, 4, 6, 8]
 ```
 `LayerNorm` 就在这几个特征内部做归一化。
-7. nn.BatchNorm1d(...)
+7. **nn.BatchNorm1d()**
 `nn.BatchNorm1d(...)` 是**一维批量归一化**：对一个 batch 里，同一个特征在不同样本之间做归一化。参数表示**数据一共有多少种特征**。
 ```python
 样本1：[1, 10]
@@ -557,25 +609,6 @@ embedding = nn.Embedding(3, 4)
 
 - Embedding 的向量是怎么来的？
 >**Embedding 的向量不是人工提前规定的，而是模型通过训练学习出来的**。初始时，PyTorch 默认使用随机初始化的向量。例如：`猫 → [0.2, -0.8, 0.1, 0.5]`，经过训练，模型通过反向传播逐渐调整这些数值，让它们更适合当前任务。
-9. **nn.Sequential()**
-`nn.Sequential(网络层1, 网络层2, 网络层3, ...)` 是 **PyTorch 自带的神经网络容器类**，作用是**把多个神经网络层按顺序组合起来，输入数据后依次执行这些层**。
-```python
-import torch
-from torch import nn
-
-net = nn.Sequential( # 创建神经网络
-    nn.Linear(4, 8),
-    nn.ReLU(),
-    nn.Linear(8, 2)
-)
-X = torch.ones((3, 4)) # 输入数据
-Y = net(X) # 前向传播
-
-print(Y.shape)
-
->>> torch.Size([3, 2])
-```
-这里的数据变化是 $4维\rightarrow8维\rightarrow\operatorname{ReLU}\rightarrow2维$
 10. **nn.ReLU()**
 `nn.ReLU()` 是 **PyTorch 自带的激活层**，作用是**把小于 0 的数变成 0，大于等于 0 的数保持不变**。公式 $\operatorname{ReLU}(x)=\max(0,x)$。它主要作用是给神经网络**加入非线性**，否则连续多个 `Linear` 本质上仍然只是一个线性变换。
 ```python
@@ -675,6 +708,71 @@ print(x)
 - `nn.init`：PyTorch 提供的参数初始化模块。
 - `zeros_()`：将张量中的所有元素设置为 0。
 - `tensor`：需要初始化的张量。
+15. **nn.Sequential()**
+`nn.Sequential(网络层1, 网络层2, 网络层3, ...)` 是 **PyTorch 自带的神经网络容器类**，作用是**把多个神经网络层按顺序组合起来，输入数据后依次执行这些层**。
+```python
+import torch
+from torch import nn
+
+net = nn.Sequential( # 创建神经网络
+    nn.Linear(4, 8),
+    nn.ReLU(),
+    nn.Linear(8, 2)
+)
+X = torch.ones((3, 4)) # 输入数据
+Y = net(X) # 前向传播
+
+print(Y.shape)
+
+>>> torch.Size([3, 2])
+```
+这里的数据变化是 $4维\rightarrow8维\rightarrow\operatorname{ReLU}\rightarrow2维$
+16. **nn.ModuleList()**
+`nn.ModuleList(modules=None)` 是 PyTorch 中非常常用的一个神经网络模块容器，用于将多个神经网络层存放在一起，并让 PyTorch 自动管理这些层的参数。
+
+参数说明：
+
+| 参数        | 含义                      |
+| --------- | ----------------------- |
+| `modules` | 需要存放的神经网络模块，可以是列表等可迭代对象 |
+| `None`    | 默认创建一个空的模块容器            |
+```python
+import torch
+from torch import nn
+
+layers = nn.ModuleList([
+    nn.Linear(10, 20),
+    nn.Linear(20, 30),
+    nn.Linear(30, 5)
+])
+
+print(layers)
+
+>>> ModuleList(
+>>>   (0): Linear(in_features=10, out_features=20, bias=True)
+>>>   (1): Linear(in_features=20, out_features=30, bias=True)
+>>>   (2): Linear(in_features=30, out_features=5, bias=True)
+>>> )
+
+print(len(layers))
+
+>>> 3
+
+print(layers[0])
+
+>>> Linear(in_features=10, out_features=20, bias=True)
+```
+
+注：与 nn.Sequential() 区别
+
+| 特性            | `nn.ModuleList()` | `nn.Sequential()` |
+| ------------- | ----------------- | ----------------- |
+| 保存多个网络层       | 可以                | 可以                |
+| 自动注册参数        | 可以                | 可以                |
+| 支持索引访问        | 可以                | 可以                |
+| **自动依次执行网络层** | 不可以               | 可以                |
+| 需要自己编写执行逻辑    | 是                 | 通常不需要             |
+| 适合复杂模型        | 更灵活               | 适合顺序结构            |
 # 四、其他
 1. **对象[下标]**
 `对象[下标]` 是 **Python 的索引语法**，表示从一个对象里，取指定位置的元素。`函数(...)[0]` = **先执行函数，再对函数返回结果做 `[0]` 索引。**
