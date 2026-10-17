@@ -100,6 +100,37 @@ print(query.shape)
 >>> torch.Size([2, 3, 4])
 ```
 说明 `query` 是一个三维张量，各维度大小分别为 2、3、4。
+12. **torch.topk()**
+`torch.topk(input, k, dim=None, largest=True, sorted=True)` 是 PyTorch 中非常常用的函数，用于从张量中选出数值最大的 k 个元素，并返回这些元素的值和索引。
+参数说明：
+
+| 参数        | 含义         | 默认值    |
+| --------- | ---------- | ------ |
+| `input`   | 输入张量       | 必填     |
+| `k`       | 选择多少个元素    | 必填     |
+| `dim`     | 沿哪个维度进行选择  | 最后一个维度 |
+| `largest` | 是否选择最大的元素  | `True` |
+| `sorted`  | 是否将结果按数值排序 | `True` |
+返回两个张量：
+
+- `values`：选出的 k 个元素的数值。
+- `indices`：这些元素在原张量中对应维度上的索引。
+
+```python
+import torch
+
+x = torch.tensor([0.2, 0.8, 0.1, 0.9, 0.5])
+
+values, indices = torch.topk(x, k=3)
+
+print(values)
+
+>>> tensor([0.9000, 0.8000, 0.5000])
+
+print(indices)
+
+>>> tensor([3, 1, 4])
+```
 # 二、torch.Tensor 张量方法
 1. **repeat()**
 `repeat()`：**重复整个张量 / 整块复制**，形式是 `张量.repeat(第0维重复次数, 第1维重复次数, 第2维重复次数, ...)`，也可以把这些数字写成一个元组 `张量.repeat((2, 3))` 和 `张量.repeat(2, 3)` 是一样的。
@@ -296,6 +327,34 @@ x.type(torch.float16) #将张量 `x` 转换为 16 位浮点数类型。
 注：
 - `type(x)`：Python 内置函数，获取对象的类型。
 - `x.type()`：PyTorch 张量的方法，可以查看张量类型，也可以转换类型。
+
+13. **torch.empty()**
+`torch.empty(*size, dtype=None, device=None)` 是 PyTorch 中的一个张量创建函数，用于创建指定形状的张量，但不初始化其中的元素数值。与 `torch.zeros()`、`torch.ones()` 最大的区别是：**`torch.empty()` 不会主动将张量填充为 0、1 或随机数**。
+
+主要参数：
+
+| 参数       | 含义               |
+| -------- | ---------------- |
+| `size`   | 张量的形状            |
+| `dtype`  | 张量的数据类型          |
+| `device` | 张量所在设备，如 CPU、GPU |
+
+```python
+import torch
+
+x = torch.empty(2, 3)
+
+print(x)
+
+>>> tensor([[2.3694e-38, 0.0000e+00, 1.4013e-45],
+>>>         [0.0000e+00, 4.2039e-45, 0.0000e+00]])
+
+print(x.shape)
+
+>>> torch.Size([2, 3])
+```
+
+注：**`torch.empty()` 创建的张量虽然有确定的形状，但其元素数值是不确定的**。它可能包含内存中残留的数据，不能假设这些数据等于 0，也不能把它们当成有意义的随机数。
 # 三、torch.nn（含 nn.Module 模型方法）
 1. **nn.MSELoss()**
 `nn.MSELoss()` 是 **PyTorch 的均方误差损失函数**，计算的是 $\text{MSE}=\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat y_i)^2$，也就是**预测值和真实值的差，先平方，再取平均。**
@@ -572,6 +631,50 @@ print(y)
 >>> tensor([[0.0900, 0.2447, 0.6652],
         [0.0900, 0.2447, 0.6652]])
 ```
+13. **nn.init.normal_()**
+`nn.init.normal_()` 是 PyTorch 中的一个参数初始化函数，用于按照正态分布（Normal Distribution）生成随机数，并填充到指定张量中。
+```python
+import torch
+from torch import nn
+
+x = torch.empty(2, 3)
+nn.init.normal_(x, mean=0.0, std=0.01)
+
+print(x)
+
+>>> tensor([[ 0.0042, -0.0081,  0.0123],
+>>>         [-0.0035,  0.0067, -0.0019]])
+
+print(x.shape)
+
+>>> torch.Size([2, 3])
+```
+- `tensor`：需要初始化的张量。
+- `mean`：正态分布的均值，默认是 `0.0`。
+- `std`：正态分布的标准差，默认是 `1.0`。
+
+注：函数名称最后的 `_` 表示**原地操作**（In-place Operation），即**直接修改传入的张量**，而不是创建一个新的张量。
+14. **nn.init.zeros_()**
+`nn.init.zeros_()` 是 PyTorch 中的一个参数初始化函数，用于将指定张量中的所有元素设置为 0。
+```python
+import torch
+from torch import nn
+
+x = torch.randn(2, 3)
+print(x)
+
+>>> tensor([[ 0.2341, -1.2354,  0.4521],
+>>>         [ 1.3245,  0.2345, -0.6721]])
+
+nn.init.zeros_(x)
+print(x)
+
+>>> tensor([[0., 0., 0.],
+>>>         [0., 0., 0.]])
+```
+- `nn.init`：PyTorch 提供的参数初始化模块。
+- `zeros_()`：将张量中的所有元素设置为 0。
+- `tensor`：需要初始化的张量。
 # 四、其他
 1. **对象[下标]**
 `对象[下标]` 是 **Python 的索引语法**，表示从一个对象里，取指定位置的元素。`函数(...)[0]` = **先执行函数，再对函数返回结果做 `[0]` 索引。**
