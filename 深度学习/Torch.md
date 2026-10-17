@@ -334,9 +334,26 @@ loss(y_pred, y_true)
 - $(4-6)^2=4$
 所以直接保留 `[1, 4]`
 规则：$\begin{cases} none → 不处理 \\ mean → 求平均 \\ sum  → 求和 \end{cases}$
-2. **net.parameters()**
-`net.parameters()` 作用是**取出模型里所有需要训练的参数**。
-3. **nn.Linear()**
+2. **.parameters()**
+`.parameters()` 是 PyTorch 中非常常用的方法，用于获取神经网络模型中所有已注册的可训练参数。它是 `torch.nn.Module` 类提供的方法，因此继承自 `nn.Module` 的神经网络都可以使用。
+```python
+import torch
+from torch import nn
+
+model = nn.Linear(3, 2)
+
+for param in model.parameters():
+    print(param)
+```
+可能输出：
+```python
+>>> Parameter containing:
+>>> tensor([[ 0.1234, -0.2345,  0.3456],
+>>>         [ 0.4567,  0.5678, -0.6789]], requires_grad=True)
+>>> Parameter containing:
+>>> tensor([0.1234, -0.2345], requires_grad=True)
+```
+2. **nn.Linear()**
 `nn.Linear(输入维度, 输出维度)` 是 **PyTorch 里的全连接线性层**。它做的事情本质上是 $y=xW^T+b$。
 ```python
 layer = nn.Linear(4, 8)
