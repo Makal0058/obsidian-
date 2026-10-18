@@ -1,5 +1,5 @@
 
-1. @dataclass
+1. **@dataclass**
 `@dataclass` 是 Python 提供的一个装饰器，中文通常称为「数据类装饰器」，主要作用是：自动为类生成 `__init__()` 等方法，让我们不用手动编写重复的初始化代码。
 
 - **不使用 @dataclass**
@@ -173,4 +173,32 @@ print(isinstance(a, int))
 print(isinstance(b, float))
 
 >>> True
+```
+
+5. **enumerate()**
+`enumerate(iterable, start=0)` 是 Python 中非常常用的内置函数，用于在遍历列表等可迭代对象时，同时获取元素的索引和元素本身。
+
+| 参数         | 含义                | 默认值 |
+| ---------- | ----------------- | --- |
+| `iterable` | 可迭代对象，例如列表、元组、字符串 | 必填  |
+| `start`    | 索引（计数）的起始值        | `0` |
+**`enumerate()` 返回一个枚举迭代器，每次迭代产生一个包含索引和元素的元组。**
+```python
+experts = ["专家A", "专家B", "专家C"]
+
+for expert in experts:
+    print(expert)
+
+>>> 专家A
+>>> 专家B
+>>> 专家C
+
+experts = ["专家A", "专家B", "专家C"]
+
+for i, expert in enumerate(experts):
+    print(i, expert)
+
+>>> 0 专家A
+>>> 1 专家B
+>>> 2 专家C
 ```

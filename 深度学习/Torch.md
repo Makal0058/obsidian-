@@ -407,7 +407,91 @@ print(y.shape)
 ```
 
 原来的张量有 12 个元素，变形后的张量仍然有 12 个元素。因此，必须满足 $\text{改变形状前的元素总数}=\text{改变形状后的元素总数}$。
+16. **.expand()**
+`expand(*sizes)` 是 PyTorch 中用于扩展张量形状的方法，**它可以把大小为 `1` 的维度扩展成指定大小，而且通常不需要复制数据，因此比 `repeat()` 更节省内存**。
+```python
+import torch
+
+x = torch.tensor([[1, 2, 3]])
+print(x.shape)
+
+>>> torch.Size([1, 3])
+
+y = x.expand(3, 3)
+print(y)
+
+>>> tensor([[1, 2, 3],
+>>>         [1, 2, 3],
+>>>         [1, 2, 3]])
+
+print(y.shape)
+
+>>> torch.Size([3, 3])
+```
+原来的张量 $X=\begin{bmatrix}1&2&3\end{bmatrix}$，使用 `expand(3, 3)` 后 $Y=\begin{bmatrix}1&2&3\\1&2&3\\1&2&3\end{bmatrix}$。可以理解为把原来的一行扩展成三行。
+17. **.masked_fill()**
+`.masked_fill(mask, value)` 是 PyTorch 中非常常用的张量方法，用于根据布尔掩码（Mask），将张量中指定位置的元素替换为某个数值。返回一个新的张量，原始张量不会被修改。
+
+| 参数 | 含义 |
+| --- | --- |
+| `tensor` | 原始张量 |
+| `mask` | 布尔掩码，`True` 表示需要替换 |
+| `value` | 用来替换的数值 |
+注：**核心规则：`mask=True` 的位置被替换，`mask=False` 的位置保持不变**。
+```python
+import torch
+
+x = torch.tensor([1, 2, 3, 4, 5])
+mask = torch.tensor([False, True, False, True, False])
+y = x.masked_fill(mask, 0)
+
+print(x)
+
+>>> tensor([1, 2, 3, 4, 5])
+
+print(mask)
+
+>>> tensor([False, True, False, True, False])
+
+print(y)
+
+>>> tensor([1, 0, 3, 0, 5])
+```
+
+18. **.contiguous()**
+`tensor.contiguous()` 是 PyTorch 中非常常用的张量方法，用于确保张量的数据在内存中按照连续的布局存储。它不需要传入参数，返回一个内存布局连续的张量。
+
+注：
+- 如果原张量已经连续，通常直接返回原张量。
+- 如果原张量不连续，就复制数据并重新排列，使其在内存中连续。
+- 不改变张量的形状，也不改变对应位置的元素值。
+
+**什么叫内存连续？**
+```python
+import torch
+
+x = torch.tensor([
+    [1, 2, 3],
+    [4, 5, 6]
+])
+
+print(x.is_contiguous())
+
+>>> True
+
+print(x.stride())
+
+>>> (3, 1)
+```
+这里的 `is_contiguous()` 用来检查张量的内存是否连续。**`stride()` 表示在内存中沿某个维度移动一个位置，需要跨过多少个元素**。原张量：
+
+| 第 1 列 | 第 2 列 | 第 3 列 |
+| --- | --- | --- |
+| 1 | 2 | 3 |
+| 4 | 5 | 6 |
+张量形状：`(2, 3)`。内存中的排列顺序 `1 → 2 → 3 → 4 → 5 → 6`。张量按行排列时，元素在内存中也是按照 1、2、3、4、5、6 的顺序存放的。
 # 三、torch.nn（含 nn.Module 模型方法）
+
 1. **nn.MSELoss()**
 `nn.MSELoss()` 是 **PyTorch 的均方误差损失函数**，计算的是 $\text{MSE}=\frac{1}{n}\sum_{i=1}^{n}(y_i-\hat y_i)^2$，也就是**预测值和真实值的差，先平方，再取平均。**
 ```python
@@ -445,6 +529,7 @@ loss(y_pred, y_true)
 - $(4-6)^2=4$
 所以直接保留 `[1, 4]`
 规则：$\begin{cases} none → 不处理 \\ mean → 求平均 \\ sum  → 求和 \end{cases}$
+
 2. **.parameters()**
 `.parameters()` 是 PyTorch 中非常常用的方法，用于获取神经网络模型中所有已注册的可训练参数。它是 `torch.nn.Module` 类提供的方法，因此继承自 `nn.Module` 的神经网络都可以使用。
 ```python
@@ -464,12 +549,14 @@ for param in model.parameters():
 >>> Parameter containing:
 >>> tensor([0.1234, -0.2345], requires_grad=True)
 ```
+
 2. **nn.Linear()**
 `nn.Linear(输入维度, 输出维度)` 是 **PyTorch 里的全连接线性层**。它做的事情本质上是 $y=xW^T+b$。
 ```python
 layer = nn.Linear(4, 8)
 ```
 把一个 **4 维向量** 变成一个 **8 维向量**。例如输入 `[x1, x2, x3, x4]`，经过 `nn.Linear(4, 8)` 后，输出会有 8 个数。
+
 4. **nn.Dropout()**
 PyTorch 的 `torch.nn` 确实提供了两种 `Dropout` 接口 `nn.Dropout()与nn.functional.dropout()`。
 - `nn.Dropout(p，inplace)` 是 **PyTorch 的 Dropout 层**，作用是训练时随机把一部分神经元输出变成 0，防止模型过拟合。
@@ -541,6 +628,7 @@ print(y)
 | `F.dropout(x)`       | 位置参数传递  |
 | `F.dropout(input=x)` | 关键字参数传递 |
 这里的 `attn_weights` 是经过 Softmax 得到的注意力权重张量，Dropout 会随机将其中部分权重置零，并对保留的权重进行缩放。
+
 5. **attention.eval()**
 `attention.eval()` 是 **PyTorch 模型的方法**，意思是**把模型切换到“评估模式 / 测试模式”**。这时候像 `nn.Dropout(...)` 就会停止随机丢弃神经元。
 也就是说：
@@ -551,7 +639,8 @@ eval() 后：Dropout 关闭
 `attention.eval()` 与 `training=False` 两者都能关闭 Dropout，但控制的范围不同。
 - `training=False`：只控制当前这一次 `F.dropout()` 调用。
 - `attention.eval()`：将整个 `attention` 模块及其子模块切换到评估模式。
-6. nn.LayerNorm(...)
+
+6. **nn.LayerNorm(...)**
 `nn.LayerNorm(...)` 是**层归一化**：对一个样本内部的特征做归一化，让数值分布更稳定。参数表示**把多少个特征看成一组，放在一起做归一化**。
 比如一个词元向量：
 ```python
@@ -566,6 +655,7 @@ eval() 后：Dropout 关闭
 样本3：[3, 30]
 ```
 它会分别对 `第1个特征：[1, 2, 3]`、`第2个特征：[10, 20, 30]` 做归一化。
+
 8. **nn.Embedding()**
 `nn.Embedding()` 是 **PyTorch 自带的词嵌入层**，作用是**把词元 ID（整数）转换成可以训练的向量**。 
 ```python
@@ -609,7 +699,8 @@ embedding = nn.Embedding(3, 4)
 
 - Embedding 的向量是怎么来的？
 >**Embedding 的向量不是人工提前规定的，而是模型通过训练学习出来的**。初始时，PyTorch 默认使用随机初始化的向量。例如：`猫 → [0.2, -0.8, 0.1, 0.5]`，经过训练，模型通过反向传播逐渐调整这些数值，让它们更适合当前任务。
-10. **nn.ReLU()**
+
+9. **nn.ReLU()**
 `nn.ReLU()` 是 **PyTorch 自带的激活层**，作用是**把小于 0 的数变成 0，大于等于 0 的数保持不变**。公式 $\operatorname{ReLU}(x)=\max(0,x)$。它主要作用是给神经网络**加入非线性**，否则连续多个 `Linear` 本质上仍然只是一个线性变换。
 ```python
 import torch
@@ -621,7 +712,8 @@ print(relu(X))
 
 >>> tensor([0., 0., 0., 2., 3.])
 ```
-11. **add_module()**
+
+10. **add_module()**
 `add_module(名字, 子模块)` 是 **PyTorch 自带的 `nn.Module` 方法**，作用是**给一个神经网络模块手动添加一个子模块，并给它起名字**。
 ```python
 from torch import nn  
@@ -642,7 +734,8 @@ print(net)
   (relu): ReLU()
 )
 ```
-12. **nn.functional.softmax()**
+
+11. **nn.functional.softmax()**
 `nn.functional.softmax(input, dim)` 是 PyTorch 中的 Softmax 函数，`input` 是输入张量、`dim` 是指定沿哪个维度进行 Softmax。作用是将一组原始分数转换为非负权重，使指定维度上的权重之和等于 1，$\operatorname{softmax}(x_i)=\frac{e^{x_i}}{\sum_{j=1}^{n}e^{x_j}}$。
 其中：
 - $x_i$：第 $i$ 个原始分数。
@@ -664,7 +757,8 @@ print(y)
 >>> tensor([[0.0900, 0.2447, 0.6652],
         [0.0900, 0.2447, 0.6652]])
 ```
-13. **nn.init.normal_()**
+
+12. **nn.init.normal_()**
 `nn.init.normal_()` 是 PyTorch 中的一个参数初始化函数，用于按照正态分布（Normal Distribution）生成随机数，并填充到指定张量中。
 ```python
 import torch
@@ -687,7 +781,8 @@ print(x.shape)
 - `std`：正态分布的标准差，默认是 `1.0`。
 
 注：函数名称最后的 `_` 表示**原地操作**（In-place Operation），即**直接修改传入的张量**，而不是创建一个新的张量。
-14. **nn.init.zeros_()**
+
+13. **nn.init.zeros_()**
 `nn.init.zeros_()` 是 PyTorch 中的一个参数初始化函数，用于将指定张量中的所有元素设置为 0。
 ```python
 import torch
@@ -708,7 +803,8 @@ print(x)
 - `nn.init`：PyTorch 提供的参数初始化模块。
 - `zeros_()`：将张量中的所有元素设置为 0。
 - `tensor`：需要初始化的张量。
-15. **nn.Sequential()**
+
+14. **nn.Sequential()**
 `nn.Sequential(网络层1, 网络层2, 网络层3, ...)` 是 **PyTorch 自带的神经网络容器类**，作用是**把多个神经网络层按顺序组合起来，输入数据后依次执行这些层**。
 ```python
 import torch
@@ -727,7 +823,8 @@ print(Y.shape)
 >>> torch.Size([3, 2])
 ```
 这里的数据变化是 $4维\rightarrow8维\rightarrow\operatorname{ReLU}\rightarrow2维$
-16. **nn.ModuleList()**
+
+15. **nn.ModuleList()**
 `nn.ModuleList(modules=None)` 是 PyTorch 中非常常用的一个神经网络模块容器，用于将多个神经网络层存放在一起，并让 PyTorch 自动管理这些层的参数。
 
 参数说明：
