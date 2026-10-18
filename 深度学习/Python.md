@@ -202,3 +202,10 @@ for i, expert in enumerate(experts):
 >>> 1 专家B
 >>> 2 专家C
 ```
+
+6. Python 的条件表达式 `A if 条件 else B` 表示：
+
+- 条件成立，选择 `A`。
+- 条件不成立，选择 `B`。
+
+7. 
