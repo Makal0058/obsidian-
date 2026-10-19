@@ -870,6 +870,79 @@ print(layers[0])
 | **自动依次执行网络层** | 不可以               | 可以                |
 | 需要自己编写执行逻辑    | 是                 | 通常不需要             |
 | 适合复杂模型        | 更灵活               | 适合顺序结构            |
+
+16. **nn.CrossEntropyLoss()**
+`nn.CrossEntropyLoss()` 是 PyTorch 中非常常用的交叉熵损失函数（Cross-Entropy Loss），主要用于分类任务，衡量神经网络预测结果与真实类别之间的差距。
+```python
+import torch
+from torch import nn
+
+loss_fn = nn.CrossEntropyLoss()
+loss = loss_fn(input, target)
+```
+整个过程分为两步：
+
+1. `nn.CrossEntropyLoss()`：创建一个损失函数对象。
+2. `loss_fn(input, target)`：调用损失函数，计算预测结果与真实标签之间的损失。两个主要参数：
+
+| 参数       | 含义                       | 常见形状                        |
+| -------- | ------------------------ | --------------------------- |
+| `input`  | 模型输出的原始得分（Logits，未归一化得分） | `(batch_size, num_classes)` |
+| `target` | 每个样本的真实类别索引              | `(batch_size,)`             |
+注：**通常直接传入模型输出的 Logits，不需要提前使用 Softmax。**
+
+假设有两个样本，每个样本需要从三个类别中选择一个。
+```python
+import torch
+from torch import nn
+
+logits = torch.tensor([ # 第一步：模型输出的原始得分
+    [2.0, 1.0, 0.1],
+    [0.5, 2.5, 0.3]
+])
+target = torch.tensor([0, 1]) # 第二步：真实类别索引
+loss_fn = nn.CrossEntropyLoss() # 第三步：创建交叉熵损失函数
+loss = loss_fn(logits, target) # 第四步：计算损失
+
+print(logits.shape)
+
+>>> torch.Size([2, 3])
+
+print(target.shape)
+
+>>> torch.Size([2])
+
+print(loss)
+
+>>> tensor(0.3185)
+
+print(loss.item())
+
+>>> 0.3185397684574127
+```
+逐行理解：
+
+- `logits`：模型给两个样本各输出三个类别的得分。
+- `target = [0, 1]`：第一个样本的正确类别是 0，第二个样本的正确类别是 1。
+- `nn.CrossEntropyLoss()`：创建损失函数。
+- `loss_fn(logits, target)`：计算两个样本的平均交叉熵损失。
+- `loss.item()`：把损失张量转换成普通 Python 数值。
+
+注：**交叉熵损失怎么算**
+
+以第一个样本为例 `logits = torch.tensor([2.0, 1.0, 0.1])` 模型给三个类别的原始得分分别为 2.0、1.0 和 0.1。
+
+**第一步，利用 Softmax 将得分转换成概率**：$p_i=\frac{e^{z_i}}{\sum_j e^{z_j}}$，得到大约 $p=[0.659,\ 0.242,\ 0.099]$。
+第一个样本的预测概率：
+
+| 类别 | 预测概率 |
+| --- | --- |
+| 类别 0（正确） | 65.9% |
+| 类别 1 | 24.2% |
+| 类别 2 | 9.9% |
+**第二步，计算正确类别的负对数概率**：$L=-\log(p_{\text{正确类别}})$，第一个样本的真实类别是 0，因此 $L_1=-\log(0.659)\approx0.417$；同理，第二个样本的真实类别为 1，得到 $L_2\approx0.220$。
+
+**最后，对两个样本取平均**：$L=\frac{L_1+L_2}{2}\approx0.3185$。这就是默认 `nn.CrossEntropyLoss()` 计算出来的损失。**正确类别的预测概率越大，交叉熵损失越小。**
 # 四、其他
 1. **对象[下标]**
 `对象[下标]` 是 **Python 的索引语法**，表示从一个对象里，取指定位置的元素。`函数(...)[0]` = **先执行函数，再对函数返回结果做 `[0]` 索引。**
